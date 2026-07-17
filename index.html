@@ -1170,6 +1170,10 @@
 
         // --- GERENCIADOR DE EVENTOS DE TECLADO ---
         document.addEventListener('keydown', function(e) {
+            // --- NOVO: ESCUDO DE INTERFACE ---
+            // Ignora os atalhos da planilha se o cursor estiver dentro de uma caixa de texto da interface
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
             if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
             
             if (e.ctrlKey) {
