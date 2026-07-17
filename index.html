@@ -1309,6 +1309,15 @@
             }
         });
 
+        tabela.addEventListener('dblclick', function(e) { 
+            if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
+            
+            // --- NOVO: BLOQUEIO DO PINCEL ---
+            if (pincelAtivo) return; // Ignora o duplo clique se a maquiagem estiver ligada
+            
+            if (e.target.tagName === 'TD') entrarModoEdicao(e.target); 
+        });
+
         // --- GERENCIADOR DE EVENTOS DE TECLADO ---
         document.addEventListener('keydown', function(e) {
             // --- NOVO: ESCUDO DE INTERFACE ---
@@ -1339,6 +1348,10 @@
                 if (e.key.toLowerCase() === 'x') { if(checkSelectionRegularity()) acaoRecortar(); return; }
                 if (e.key.toLowerCase() === 'z') { if(!isEditing) { e.preventDefault(); acaoDesfazer(); } return; }
                 if (e.key.toLowerCase() === 'y') { if(!isEditing) { e.preventDefault(); acaoRefazer(); } return; }
+                
+                // --- ATALHOS NOVOS: Pular para o começo ou fim da tabela (Ctrl + Home / End) ---
+                if (e.key === 'Home') { e.preventDefault(); moverSelecaoAbsoluta(0, 0); return; }
+                if (e.key === 'End') { e.preventDefault(); moverSelecaoAbsoluta(totalLinhas - 1, totalColunas - 1); return; }
             }
 
             if (!celulaAtual) return;
@@ -1355,6 +1368,38 @@
                     }
                 }
                 if (e.key === 'Escape') { celulaAtual.innerText = valorPreEdicao; sairModoEdicao(true); } 
+                
+                // --- ATALHO NOVO: Pular com TAB enquanto edita ---
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    sairModoEdicao();
+                    moverSelecao(0, e.shiftKey ? -1 : 1);
+                }
+                return;
+            }
+
+            // --- ATALHOS NOVOS: Expandir Seleção com SHIFT + Setas ---
+            if (e.shiftKey && e.key.startsWith('Arrow')) {
+                e.preventDefault();
+                let posRow = currentRow;
+                let posCol = currentCol;
+                
+                // Se só havia uma célula selecionada, define ela como âncora fixa
+                if (selectedCells.length <= 1) { dragStartRow = currentRow; dragStartCol = currentCol; }
+
+                if (e.key === 'ArrowUp') posRow = Math.max(0, posRow - 1);
+                if (e.key === 'ArrowDown') posRow = Math.min(totalLinhas - 1, posRow + 1);
+                if (e.key === 'ArrowLeft') posCol = Math.max(0, posCol - 1);
+                if (e.key === 'ArrowRight') posCol = Math.min(totalColunas - 1, posCol + 1);
+
+                if (posRow !== currentRow || posCol !== currentCol) {
+                    currentRow = posRow; currentCol = posCol;
+                    selectRectangle(dragStartRow, dragStartCol, currentRow, currentCol, false);
+                    
+                    // Rola a câmera para acompanhar a ponta da seleção
+                    const tr = document.getElementById('corpoTabela').children[currentRow];
+                    tr.children[currentCol + 1].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+                }
                 return;
             }
 
@@ -1364,6 +1409,9 @@
                 case 'ArrowDown': deltaL = 1; e.preventDefault(); break;
                 case 'ArrowLeft': deltaC = -1; e.preventDefault(); break;
                 case 'ArrowRight': deltaC = 1; e.preventDefault(); break;
+                case 'Tab': deltaC = e.shiftKey ? -1 : 1; e.preventDefault(); break; // --- ATALHO NOVO: TAB E SHIFT+TAB ---
+                case 'Home': moverSelecaoAbsoluta(currentRow, 0); e.preventDefault(); return; // --- ATALHO NOVO: HOME ---
+                case 'End': moverSelecaoAbsoluta(currentRow, totalColunas - 1); e.preventDefault(); return; // --- ATALHO NOVO: END ---
                 case 'Enter': 
                     e.preventDefault(); 
                     if (selectedCells.length > 1) {
@@ -1409,6 +1457,14 @@
 
         function moverSelecao(deltaL, deltaC) {
             const novaL = currentRow + deltaL; const novaC = currentCol + deltaC;
+            if (novaL >= 0 && novaL < totalLinhas && novaC >= 0 && novaC < totalColunas) {
+                const tr = document.getElementById('corpoTabela').children[novaL];
+                selecionarUmaCelula(tr.children[novaC + 1]);
+            }
+        }
+
+        // --- ATALHOS NOVOS: FUNÇÃO AUXILIAR DE PULO ABSOLUTO ---
+        function moverSelecaoAbsoluta(novaL, novaC) {
             if (novaL >= 0 && novaL < totalLinhas && novaC >= 0 && novaC < totalColunas) {
                 const tr = document.getElementById('corpoTabela').children[novaL];
                 selecionarUmaCelula(tr.children[novaC + 1]);
