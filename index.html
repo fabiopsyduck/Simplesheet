@@ -241,6 +241,30 @@
         table.export-hide-headers thead { display: none !important; }
         table.export-hide-headers tbody th { display: none !important; }
         
+		/* --- NOVO: CABEÇALHOS E NÚMEROS FIXOS NA TELA (STICKY) --- */
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            /* Garante que o fundo cinza bloqueie a visão do texto rolando por baixo */
+            background-color: #c0c0c0; 
+        }
+
+        tbody th {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+            background-color: #c0c0c0;
+        }
+
+        /* O quadradinho do canto superior esquerdo precisa ficar acima de tudo */
+        thead th.corner {
+            position: sticky;
+            top: 0;
+            left: 0;
+            z-index: 20; 
+        }
+		
 		/* --- ESTILOS DO PINCEL E PALETA (NOVO) --- */
         .btn-active {
             border-style: inset !important;
@@ -289,6 +313,7 @@
                 outline: none !important; 
                 -webkit-print-color-adjust: exact !important; /* Força Chrome e Edge a imprimirem a cor do fundo */
                 print-color-adjust: exact !important;         /* Força o Firefox a imprimir a cor do fundo */
+                position: static !important;                  /* NOVO: Desliga a ancoragem no papel para evitar bugs */
             }
             th { background-color: #e0e0e0 !important; }
             td.selected, td.mass-selected { outline: none; background-color: white; }
