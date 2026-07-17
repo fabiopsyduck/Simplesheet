@@ -1309,122 +1309,37 @@
             }
         });
 
-        tabela.addEventListener('dblclick', function(e) { 
-            if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
-            
-            // --- NOVO: BLOQUEIO DO PINCEL ---
-            if (pincelAtivo) return; // Ignora o duplo clique se a maquiagem estiver ligada
-            
-            if (e.target.tagName === 'TD') entrarModoEdicao(e.target); 
-        });
-
         // --- GERENCIADOR DE EVENTOS DE TECLADO ---
         document.addEventListener('keydown', function(e) {
-            // ESCUDO DE INTERFACE
+            // --- NOVO: ESCUDO DE INTERFACE ---
+            // Ignora os atalhos da planilha se o cursor estiver dentro de uma caixa de texto da interface
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
             if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
             
-            // --- ATALHOS COM CTRL ---
-            if (e.ctrlKey && !e.shiftKey && !e.altKey) {
+            if (e.ctrlKey) {
+                // --- NOVO: ATALHO CTRL + A (Selecionar Tudo) ---
                 if (e.key.toLowerCase() === 'a') {
                     if (!isEditing) {
-                        e.preventDefault();
+                        e.preventDefault(); // Impede o navegador de pintar a tela toda de azul
+                        
+                        // Se o usuário apertar Ctrl+A sem ter clicado em nada antes, foca na célula A1 (0,0) primeiro
                         if (!celulaAtual) {
                             const tbody = document.getElementById('corpoTabela');
                             if (tbody.children.length > 0) selecionarUmaCelula(tbody.children[0].children[1]);
                         }
+                        
+                        // Executa a seleção do retângulo englobando a matriz inteira
                         selectRectangle(0, 0, totalLinhas - 1, totalColunas - 1, false);
                     }
-                    return;
+                    return; // Retorna para não cair nas regras de navegação padrão da planilha
                 }
+
                 if (e.key.toLowerCase() === 'c') { if(checkSelectionRegularity()) acaoCopiar(); return; }
                 if (e.key.toLowerCase() === 'x') { if(checkSelectionRegularity()) acaoRecortar(); return; }
                 if (e.key.toLowerCase() === 'z') { if(!isEditing) { e.preventDefault(); acaoDesfazer(); } return; }
                 if (e.key.toLowerCase() === 'y') { if(!isEditing) { e.preventDefault(); acaoRefazer(); } return; }
-                
-                // NOVO: Pular para o começo ou fim da tabela inteira (Ctrl + Home / End)
-                if (e.key === 'Home') { e.preventDefault(); moverSelecaoAbsoluta(0, 0); return; }
-                if (e.key === 'End') { e.preventDefault(); moverSelecaoAbsoluta(totalLinhas - 1, totalColunas - 1); return; }
             }
-
-            if (!celulaAtual) return;
-
-            // --- MODO EDIÇÃO ---
-            if (isEditing) {
-                if (e.key === 'Enter') { 
-                    e.preventDefault(); 
-                    if (selectedCells.length > 1) { sairModoEdicao(); avancarCarrosselEdicao(true); } 
-                    else { sairModoEdicao(); moverSelecao(1, 0); }
-                }
-                if (e.key === 'Escape') { celulaAtual.innerText = valorPreEdicao; sairModoEdicao(true); } 
-                
-                // NOVO: Tab e Shift+Tab dentro da edição (Salva o texto e pula pra próxima)
-                if (e.key === 'Tab') {
-                    e.preventDefault();
-                    sairModoEdicao();
-                    moverSelecao(0, e.shiftKey ? -1 : 1);
-                }
-                return;
-            }
-
-            // --- NOVO: NAVEGAÇÃO DE SELEÇÃO COM SHIFT (Expandir marcação) ---
-            if (e.shiftKey && e.key.startsWith('Arrow')) {
-                e.preventDefault();
-                let posRow = currentRow;
-                let posCol = currentCol;
-                
-                // Se só havia uma célula selecionada, define ela como âncora fixa
-                if (selectedCells.length <= 1) { dragStartRow = currentRow; dragStartCol = currentCol; }
-
-                if (e.key === 'ArrowUp') posRow = Math.max(0, posRow - 1);
-                if (e.key === 'ArrowDown') posRow = Math.min(totalLinhas - 1, posRow + 1);
-                if (e.key === 'ArrowLeft') posCol = Math.max(0, posCol - 1);
-                if (e.key === 'ArrowRight') posCol = Math.min(totalColunas - 1, posCol + 1);
-
-                if (posRow !== currentRow || posCol !== currentCol) {
-                    currentRow = posRow; currentCol = posCol;
-                    selectRectangle(dragStartRow, dragStartCol, currentRow, currentCol, false);
-                    
-                    // Rola a câmera para acompanhar a ponta da seleção
-                    const tr = document.getElementById('corpoTabela').children[currentRow];
-                    tr.children[currentCol + 1].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-                }
-                return;
-            }
-
-            let deltaL = 0; let deltaC = 0;
-            switch(e.key) {
-                case 'ArrowUp': deltaL = -1; e.preventDefault(); break;
-                case 'ArrowDown': deltaL = 1; e.preventDefault(); break;
-                case 'ArrowLeft': deltaC = -1; e.preventDefault(); break;
-                case 'ArrowRight': deltaC = 1; e.preventDefault(); break;
-                case 'Tab': deltaC = e.shiftKey ? -1 : 1; e.preventDefault(); break; // NOVO: TAB E SHIFT+TAB para navegar
-                case 'Home': moverSelecaoAbsoluta(currentRow, 0); e.preventDefault(); return; // NOVO: Pula pro começo da linha
-                case 'End': moverSelecaoAbsoluta(currentRow, totalColunas - 1); e.preventDefault(); return; // NOVO: Pula pro fim da linha
-                case 'Enter': 
-                    e.preventDefault(); 
-                    if (selectedCells.length > 1) { avancarCarrosselEdicao(false); } else { deltaL = 1; }
-                    break;
-                case 'F2': e.preventDefault(); entrarModoEdicao(celulaAtual); break;
-                case 'Backspace': case 'Delete': apagarConteudoSelecao(); break;
-                default:
-                    // Se digitar uma letra, entra no modo de edição automaticamente
-                    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                        celulaAtual.innerText = ''; entrarModoEdicao(celulaAtual);
-                    }
-                    break;
-            }
-            if (deltaL !== 0 || deltaC !== 0) moverSelecao(deltaL, deltaC);
-        });
-
-        // --- NOVO: FUNÇÃO AUXILIAR DE PULO ABSOLUTO ---
-        function moverSelecaoAbsoluta(novaL, novaC) {
-            if (novaL >= 0 && novaL < totalLinhas && novaC >= 0 && novaC < totalColunas) {
-                const tr = document.getElementById('corpoTabela').children[novaL];
-                selecionarUmaCelula(tr.children[novaC + 1]);
-            }
-        }
 
             if (!celulaAtual) return;
 
