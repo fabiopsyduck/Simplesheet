@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Fabiopsyduck">
+    <title>SimpleSheet</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* --- ESTÉTICA GERAL WIN98 --- */
+        body {
+            font-family: 'MS Sans Serif', 'Arial', sans-serif;
+            background-color: #c0c0c0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .title-bar {
+            background-color: #000080;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 2px 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .toolbar {
+            background-color: #c0c0c0;
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+            border-bottom: 2px solid #808080;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            background-color: #c0c0c0;
+            border: 2px outset #dfdfdf;
+            padding: 4px 10px;
+            font-size: 12px;
+            color: black;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .btn:active { 
+            border-style: inset; 
+            padding: 5px 9px 3px 11px; 
+        }
+        
+        .btn:disabled {
+            color: #808080;
+            text-shadow: 1px 1px 0px #ffffff;
+            border-style: outset !important;
+            cursor: default;
+            pointer-events: none; /* Impede absolutamente qualquer reação ao clique do mouse */
+        }
+
+        .btn-small:disabled {
+            padding: 2px 6px !important; /* Trava o tamanho do botão pequeno para ele não engordar */
+        }
+
+        .btn-small { 
+            padding: 2px 6px; 
+            font-weight: bold; 
+        }
+        
+        .btn-small:active {
+            padding: 3px 5px 1px 7px !important;
+        }
+
+        .separator { width: 2px; background-color: #808080; border-right: 1px solid #ffffff; margin: 0 4px; height: 24px; }
+        input[type="file"] { display: none; }
+
+        fieldset.grid-size {
+            border: 2px solid;
+            border-color: #dfdfdf #808080 #808080 #dfdfdf;
+            padding: 2px 8px 4px 8px;
+            margin: 0 4px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        fieldset.grid-size legend { font-size: 11px; color: black; padding: 0 4px; }
+        .grid-size-group { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+
+        /* --- JANELA DE CONFIGURAÇÃO MODAL (WIN98) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .window-dialog {
+            background-color: #c0c0c0;
+            border: 2px outset #dfdfdf;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.4);
+            width: 330px;
+            font-size: 12px;
+            color: black;
+        }
+
+        .window-dialog .dialog-title {
+            background: linear-gradient(90deg, #000080, #1084d0);
+            color: white;
+            padding: 3px 5px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .window-dialog .close-x {
+            background: #c0c0c0;
+            border: 1px outset #fff;
+            width: 14px;
+            height: 14px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: black;
+            font-weight: bold;
+        }
+        .window-dialog .close-x:active { border-style: inset; }
+
+        .window-body { padding: 12px; }
+
+        .config-group {
+            border: 2px solid;
+            border-color: #dfdfdf #808080 #808080 #dfdfdf;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+        .config-group legend { padding: 0 4px; font-size: 11px; }
+
+        .config-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            cursor: help;
+        }
+        .config-option input[type="checkbox"] { cursor: pointer; }
+        .config-option label { cursor: help; }
+
+        .input-number-win98 {
+            width: 40px;
+            font-family: 'MS Sans Serif', sans-serif;
+            font-size: 12px;
+            padding: 1px 2px;
+            border: 2px inset #dfdfdf;
+            background: white;
+        }
+
+        .window-footer { display: flex; justify-content: flex-end; gap: 6px; }
+
+        /* --- MENUS DE CONTEXTO --- */
+        .context-menu {
+            position: absolute;
+            background-color: #c0c0c0;
+            border: 2px outset #dfdfdf;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            padding: 2px;
+            z-index: 1000;
+            min-width: 150px;
+            font-size: 12px;
+        }
+
+        .menu-item { padding: 5px 15px; cursor: pointer; color: black; }
+        .menu-item:hover { background-color: #000080; color: white; }
+        .menu-separator { height: 1px; background-color: #808080; border-bottom: 1px solid #ffffff; margin: 3px 2px; }
+        
+        .menu-item.disabled {
+            color: #808080 !important;
+            text-shadow: 1px 1px 0px #ffffff;
+            cursor: default;
+            pointer-events: none;
+        }
+        .menu-item.disabled:hover { background-color: transparent; }
+
+        /* --- PLANILHA E CÉLULAS --- */
+        .grid-container { flex: 1; background-color: #808080; overflow: auto; position: relative; }
+        
+        table { 
+            border-collapse: collapse; 
+            background-color: white; 
+            table-layout: auto; 
+        }
+
+        th, td {
+            border: 1px solid #d0d0d0;
+            height: 20px;
+            min-width: 80px; 
+            font-size: 12px;
+            padding: 0 4px;
+            white-space: nowrap; 
+            overflow: hidden;
+            box-sizing: border-box; 
+            line-height: 18px; 
+            vertical-align: middle; 
+        }
+
+        th { background-color: #c0c0c0; border: 1px outset #ffffff; font-weight: normal; text-align: center; cursor: pointer; }
+        
+        .corner { 
+            width: 30px !important; 
+            min-width: 30px !important; 
+            max-width: 30px !important; 
+            background-color: #c0c0c0; 
+            border: 1px outset #ffffff; 
+            cursor: default; 
+        }
+
+        td { cursor: cell; color: black; }
+
+        td.selected { background-color: #cce8ff; }
+        td.active-focus { outline: 2px solid #000080; outline-offset: -2px; z-index: 1; position: relative; }
+        td.editing { outline: 2px solid black; outline-offset: -2px; background-color: white; cursor: text; user-select: text; z-index: 2; position: relative; }
+        td.mass-selected { background-color: #cce8ff; } 
+        th.header-highlight { background-color: #a0a0a0; border: 1px inset #ffffff; font-weight: bold; }
+
+        table.export-hide-grid td { border-color: transparent !important; }
+        table.export-hide-headers thead { display: none !important; }
+        table.export-hide-headers tbody th { display: none !important; }
+
+        @media print {
+            body, .grid-container { height: auto; background-color: white; overflow: visible; }
+            .title-bar, .toolbar, .context-menu, .modal-overlay { display: none !important; }
+            
+            /* CORREÇÃO: Alterado de 100% para auto para manter o aproveitamento justo no papel */
+            table { width: auto !important; table-layout: auto !important; } 
+            
+            th, td { border: 1px solid black !important; outline: none !important; }
+            th { background-color: #e0e0e0 !important; -webkit-print-color-adjust: exact; }
+            td.selected, td.mass-selected { outline: none; background-color: white; }
+            
+            table.export-hide-grid td { border-color: transparent !important; }
+            table.export-hide-headers thead { display: none !important; }
+            table.export-hide-headers tbody th { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="title-bar">
+        <span id="appTitle">SimpleSheet - Aguardando seleção de formato...</span>
+    </div>
+
+    <div class="toolbar">
+        <button id="btnNovo" class="btn" title="Cria um novo documento escolhendo o formato." onclick="abrirMenuNovo(event)">📄 Novo ▾</button>
+        <div class="separator"></div>
+        
+        <label class="btn" title="Abre arquivos suportados (Auto-detecta separadores de coluna)." onmousedown="event.preventDefault()">📂 Abrir <input type="file" id="fileInput" accept=".csv, .tsv" onchange="importarCSV(event)"></label>
+        <button id="btnSalvar" class="btn" title="Salva a planilha atual no seu computador em formato CSV." onmousedown="event.preventDefault()" onclick="exportarCSV()">💾 Salvar</button>
+        <button id="btnImprimir" class="btn" title="Imprime a planilha atual em papel ou PDF." onmousedown="event.preventDefault()" onclick="imprimir()">🖨️</button>
+        <button id="btnScreenshot" class="btn" title="Captura uma imagem (Screenshot PNG) da planilha atual." onmousedown="event.preventDefault()" onclick="acaoScreenshot()">📸</button>
+        <button id="btnConfig" class="btn" title="Ajusta filtros e aparências para a Impressão e o Screenshot." onmousedown="event.preventDefault()" onclick="abrirConfigModal()">⚙️ Config. de Impressão e Foto</button>
+        
+        <div class="separator"></div>
+        <button id="btnRecortarTopo" class="btn" title="Recortar o conteúdo da célula selecionada (Ctrl+X)." onmousedown="event.preventDefault()" onclick="acaoRecortar()">✂️</button>
+        <button id="btnCopiarTopo" class="btn" title="Copiar o conteúdo da célula selecionada (Ctrl+C)." onmousedown="event.preventDefault()" onclick="acaoCopiar()">📄</button>
+        <button id="btnColarTopo" class="btn" title="Colar conteúdo na célula selecionada (Ctrl+V)." onmousedown="event.preventDefault()" onclick="acaoColarInterface()">📋</button>
+        
+        <div class="separator"></div>
+        <button id="btnDesfazer" class="btn" title="Desfazer a última ação (Ctrl+Z)." onmousedown="event.preventDefault()" onclick="acaoDesfazer()" disabled>↩️</button>
+        <button id="btnRefazer" class="btn" title="Refazer a última ação desfeita (Ctrl+Y)." onmousedown="event.preventDefault()" onclick="acaoRefazer()" disabled>↪️</button>
+
+        <div class="separator"></div>
+        
+        <fieldset class="grid-size">
+            <legend>Tamanho da Grade</legend>
+            <div class="grid-size-group">
+                <button id="btnRemoverCol" class="btn btn-small" title="Remove a última coluna da direita." onmousedown="event.preventDefault()" onclick="removerUltimaColuna()">-</button>
+                <span title="Controle de colunas">Colunas</span>
+                <button id="btnAddCol" class="btn btn-small" title="Adiciona uma nova coluna à direita." onmousedown="event.preventDefault()" onclick="adicionarUltimaColuna(true)">+</button>
+            </div>
+            <div style="width: 1px; background: #808080; border-right: 1px solid #fff; height: 16px; margin: 0 4px;"></div>
+            <div class="grid-size-group">
+                <button id="btnRemoverLinha" class="btn btn-small" title="Remove a última linha de baixo." onmousedown="event.preventDefault()" onclick="removerUltimaLinha()">-</button>
+                <span title="Controle de linhas">Linhas</span>
+                <button id="btnAddLinha" class="btn btn-small" title="Adiciona uma nova linha abaixo." onmousedown="event.preventDefault()" onclick="adicionarUltimaLinha(true)">+</button>
+            </div>
+        </fieldset>
+    </div>
+
+    <div class="grid-container" id="gridContainer">
+        
+        <div id="welcomeOverlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000;">
+            <div class="window-dialog" style="width: 320px; text-align: center; box-shadow: 4px 4px 15px rgba(0,0,0,0.5);">
+                <div class="dialog-title">
+                    <span>Aviso do Sistema</span>
+                </div>
+                <div class="window-body" style="padding: 20px;">
+                    <p style="margin-top: 0; font-size: 14px; font-weight: bold;">Planilha Bloqueada</p>
+                    <p style="margin-bottom: 0;">Vá ao menu superior e clique em <b>📄 Novo ▾</b> para escolher um formato de arquivo e iniciar seu trabalho.</p>
+                </div>
+            </div>
+        </div>
+
+        <table id="planilha">
+            <thead id="cabecalhoColunas"></thead>
+            <tbody id="corpoTabela"></tbody>
+        </table>
+    </div>
+
+    <div id="configModal" class="modal-overlay" style="display: none;">
+        <div class="window-dialog">
+            <div class="dialog-title">
+                <span>Configurações de Saída</span>
+                <div class="close-x" title="Fechar aba" onclick="fecharConfigModal()">X</div>
+            </div>
+            <div class="window-body">
+                <fieldset class="config-group">
+                    <legend>Filtros de Impressão e Imagem</legend>
+                    
+                    <div class="config-option" title="Remove completamente as linhas cinzas de grade das células, deixando o fundo totalmente branco na impressão ou foto.">
+                        <input type="checkbox" id="chkOcultarGrelha">
+                        <label for="chkOcultarGrelha">Ocultar grelha da tabela</label>
+                    </div>
+
+                    <div class="config-option" title="Oculta os cabeçalhos de coluna (A, B, C...) e de linha (1, 2, 3...) na exportação.">
+                        <input type="checkbox" id="chkOcultarCabecalhos">
+                        <label for="chkOcultarCabecalhos">Ocultar cabeçalhos de linha e coluna</label>
+                    </div>
+
+                    <div class="config-option" title="Analisa a planilha e esconde as áreas vazias automáticas, exportando apenas o seu conteúdo.">
+                        <input type="checkbox" id="chkRecorteInteligente">
+                        <label for="chkRecorteInteligente">Limpar amostragem extra (Recorte)</label>
+                    </div>
+                    
+                    <div class="config-option" style="margin-left: 20px;" title="Define quantas linhas e colunas extras (vazias) serão mantidas como respiro ao redor dos dados cortados. Mínimo 0, Máximo 20.">
+                        <label for="numFolgaRecorte">Margem de folga:</label>
+                        <input type="number" id="numFolgaRecorte" class="input-number-win98" min="0" max="20" value="1">
+                    </div>
+                </fieldset>
+                <div class="window-footer">
+                    <button class="btn" style="width: 70px; font-weight: bold;" title="Salvar e Fechar" onclick="fecharConfigModal()">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="contextMenuCabecalho" class="context-menu" style="display: none;">
+        <div id="menuCol" style="display: none;">
+            <div class="menu-item" onclick="acaoEstrutural('col', 'inserirEsq')">Inserir Coluna à Esquerda</div>
+            <div class="menu-item" onclick="acaoEstrutural('col', 'inserirDir')">Inserir Coluna à Direita</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" onclick="acaoEstrutural('col', 'limpar')">Limpar Conteúdo</div>
+            <div class="menu-item" onclick="acaoEstrutural('col', 'apagar')">Apagar Coluna</div>
+        </div>
+        <div id="menuRow" style="display: none;">
+            <div class="menu-item" onclick="acaoEstrutural('row', 'inserirAcima')">Inserir Linha Acima</div>
+            <div class="menu-item" onclick="acaoEstrutural('row', 'inserirAbaixo')">Inserir Linha Abaixo</div>
+            <div class="menu-separator"></div>
+            <div class="menu-item" onclick="acaoEstrutural('row', 'limpar')">Limpar Conteúdo</div>
+            <div class="menu-item" onclick="acaoEstrutural('row', 'apagar')">Apagar Linha</div>
+        </div>
+    </div>
+
+    <div id="contextMenuCelula" class="context-menu" style="display: none;">
+        <div id="ctxCopiar" class="menu-item" onmousedown="event.preventDefault()" onclick="acaoCopiar()">📄 Copiar</div>
+        <div id="ctxRecortar" class="menu-item" onmousedown="event.preventDefault()" onclick="acaoRecortarMenuContexto()">✂️ Recortar</div>
+        <div id="ctxColar" class="menu-item" onmousedown="event.preventDefault()" onclick="acaoColarInterface()">📋 Colar</div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" onmousedown="event.preventDefault()" onclick="apagarConteudoSelecao()">🧻 Apagar conteúdo</div>
+    </div>
+
+    <div id="contextMenuNovo" class="context-menu" style="display: none;">
+        <div class="menu-item" onclick="iniciarNovo('csv_global')">Formato Padrão Internacional (RFC 4180) [.csv] [ , ]</div>
+        <div class="menu-item" onclick="iniciarNovo('csv')">Formato Padrão Regional [.csv] [ ; ]</div>
+        <div class="menu-item" onclick="iniciarNovo('tsv')">Formato Padrão Tabulado [.tsv] [ TAB ]</div>
+        <div class="menu-item" onclick="iniciarNovo('pipe')">Formato Padrão Corporativo [.csv] [ | ]</div>
+    </div>
+
+    <script>
+        const SEPARADOR_CSV = ';'; // Regional BR
+        const SEPARADOR_GLOBAL = ','; // Oficial Global (RFC 4180)
+        const SEPARADOR_TSV = '\t';
+        const SEPARADOR_PIPE = '|'; 
+        
+        let formatoAtual = null; // Inicia totalmente neutro, sem formato padrão
+        let gradeBloqueada = true; // NOVO: A planilha nasce bloqueada para edições 
+        let ultimoFileHandle = null; // NOVO: Guarda a pasta do último salvamento 
+        
+        let totalColunas = 15;
+        let totalLinhas = 30;
+        let baseColunasTela = 15; // NOVO: Memória do tamanho da tela
+        let baseLinhasTela = 30;  // NOVO: Memória do tamanho da tela
+		
+		
+        let celulaAtual = null;
+        let isEditing = false;
+        let currentRow = 0;
+        let currentCol = 0;
+        let targetMenuIndex = -1;
+
+        // --- MOTOR DE SELEÇÃO MULTIPLA E ARRASTRE DE MOUSE (ESTILO EXCEL) ---
+        let selectedCells = [];
+        let isDragging = false;
+        let dragStartRow = -1;
+        let dragStartCol = -1;
+
+        function getRowCol(td) {
+            return {
+                r: td.parentElement.rowIndex - 1,
+                c: td.cellIndex - 1
+            };
+        }
+
+        function clearSelection() {
+            selectedCells.forEach(td => {
+                td.classList.remove('selected');
+            });
+            selectedCells = [];
+            document.querySelectorAll('.mass-selected').forEach(el => el.classList.remove('mass-selected'));
+        }
+
+        function verificarRestricoesInterface() {
+            const btnRecortar = document.getElementById('btnRecortarTopo');
+            const btnCopiar = document.getElementById('btnCopiarTopo');
+            const btnColar = document.getElementById('btnColarTopo');
+            
+            // TRAVA MESTRA: Se a grade tá bloqueada, trava a área de transferência
+            if (gradeBloqueada) {
+                btnRecortar.disabled = true;
+                btnCopiar.disabled = true;
+                btnColar.disabled = true;
+                return;
+            }
+
+            let isRegular = checkSelectionRegularity();
+            if (isRegular) {
+                btnRecortar.disabled = false;
+                btnCopiar.disabled = false;
+                btnColar.disabled = false;
+            } else {
+                btnRecortar.disabled = true;
+                btnCopiar.disabled = true;
+                btnColar.disabled = true;
+            }
+        }
+
+        function selecionarUmaCelula(td) {
+            sairModoEdicao();
+            if(celulaAtual) celulaAtual.classList.remove('active-focus');
+            clearSelection();
+            
+            celulaAtual = td;
+            celulaAtual.classList.add('active-focus');
+            td.classList.add('selected');
+            selectedCells.push(td);
+
+            let pos = getRowCol(td);
+            currentRow = pos.r;
+            currentCol = pos.c;
+            valorPreEdicao = celulaAtual.innerText;
+            
+            td.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            atualizarMirasVisuais(td);
+            
+            verificarRestricoesInterface();
+        }
+
+        function selectRectangle(r1, c1, r2, c2, append = false) {
+            const tbody = document.getElementById('corpoTabela');
+            let minR = Math.min(r1, r2);
+            let maxR = Math.max(r1, r2);
+            let minC = Math.min(c1, c2);
+            let maxC = Math.max(c1, c2);
+
+            if (!append) clearSelection();
+
+            for (let r = minR; r <= maxR; r++) {
+                let tr = tbody.children[r];
+                for (let c = minC; c <= maxC; c++) {
+                    let td = tr.children[c + 1];
+                    if (!td.classList.contains('selected')) {
+                        td.classList.add('selected');
+                    }
+                    if (!selectedCells.includes(td)) {
+                        selectedCells.push(td);
+                    }
+                }
+            }
+            if (celulaAtual) celulaAtual.classList.add('active-focus');
+            verificarRestricoesInterface();
+        }
+
+        function checkSelectionRegularity() {
+            if (selectedCells.length <= 1) return true;
+
+            let minR = Infinity, maxR = -1;
+            let minC = Infinity, maxC = -1;
+
+            for (let i = 0; i < selectedCells.length; i++) {
+                let pos = getRowCol(selectedCells[i]);
+                if (pos.r < minR) minR = pos.r;
+                if (pos.r > maxR) maxR = pos.r;
+                if (pos.c < minC) minC = pos.c;
+                if (pos.c > maxC) maxC = pos.c;
+            }
+
+            let expectedCount = (maxR - minR + 1) * (maxC - minC + 1);
+            if (selectedCells.length !== expectedCount) return false;
+
+            const tbody = document.getElementById('corpoTabela');
+            for (let r = minR; r <= maxR; r++) {
+                let tr = tbody.children[r];
+                for (let c = minC; c <= maxC; c++) {
+                    let td = tr.children[c + 1];
+                    if (!selectedCells.includes(td)) return false;
+                }
+            }
+            return true;
+        }
+
+        function apagarConteudoSelecao() {
+            contextMenuCelula.style.display = 'none';
+            selectedCells.forEach(td => { td.innerText = ''; });
+            salvarEstado();
+        }
+
+        function avancarCarrosselEdicao(manterEdicao = false) {
+            let currentIndex = selectedCells.indexOf(celulaAtual);
+            if (currentIndex === -1) return; 
+            
+            let nextIndex = (currentIndex + 1) % selectedCells.length;
+            let nextCell = selectedCells[nextIndex];
+            
+            celulaAtual.classList.remove('active-focus');
+            celulaAtual = nextCell;
+            celulaAtual.classList.add('active-focus');
+            
+            let pos = getRowCol(celulaAtual);
+            currentRow = pos.r;
+            currentCol = pos.c;
+            valorPreEdicao = celulaAtual.innerText;
+            
+            celulaAtual.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            atualizarMirasVisuais(celulaAtual);
+            
+            if (manterEdicao) {
+                entrarModoEdicao(celulaAtual);
+            }
+        }
+
+        // --- SISTEMA DE ZOOM DINÂMICO ---
+        function ajustarZoomDinamico() {
+            const container = document.getElementById('gridContainer');
+            const tabela = document.getElementById('planilha');
+            if (!container || !tabela) return;
+
+            // Mantém a trava de segurança (30px da coluna de números + 80px por coluna de dados)
+            const larguraMinimaSegura = 30 + (totalColunas * 80);
+
+            // Delega a responsabilidade de leitura de conteúdo ao motor do navegador
+            tabela.style.width = 'auto'; // Ajusta a largura de forma justa ao conteúdo digitado
+            tabela.style.minWidth = larguraMinimaSegura + 'px'; // Impede o esmagamento abaixo do padrão
+        }
+
+        window.addEventListener('resize', ajustarZoomDinamico);
+
+        // --- CONTROLE DA JANELA MODAL ---
+        function abrirConfigModal() {
+            sairModoEdicao();
+            document.getElementById('configModal').style.display = 'flex';
+        }
+
+        function fecharConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+        }
+
+        // --- SISTEMA E LÓGICA DE TRATAMENTO DE CORTE ---
+        function toggleExportLayout(ativar) {
+            const tbody = document.getElementById('corpoTabela');
+            const theadTr = document.getElementById('cabecalhoColunas').firstElementChild;
+            const tableEl = document.getElementById('planilha');
+            
+            if (!ativar) {
+                // Modo Edição: Restaura todos os visuais
+                tableEl.classList.remove('export-hide-grid');
+                tableEl.classList.remove('export-hide-headers');
+                document.querySelectorAll('.export-crop-hide').forEach(el => {
+                    el.style.display = '';
+                    el.classList.remove('export-crop-hide');
+                });
+                
+                // RESTAURA as travas de largura do Zoom Dinâmico
+                ajustarZoomDinamico();
+                return;
+            }
+            
+            // MODO EXPORTAÇÃO: Remove as travas elásticas temporariamente.
+            tableEl.style.width = '';
+            tableEl.style.minWidth = '';
+            
+            if (document.getElementById('chkOcultarGrelha').checked) {
+                tableEl.classList.add('export-hide-grid');
+            }
+            if (document.getElementById('chkOcultarCabecalhos').checked) {
+                tableEl.classList.add('export-hide-headers');
+            }
+            
+            // MÁQUINA DE RECORTE 360 GRAUS (Bounding Box)
+            if (document.getElementById('chkRecorteInteligente').checked) {
+                let folga = parseInt(document.getElementById('numFolgaRecorte').value);
+                if (isNaN(folga) || folga < 0) folga = 0;
+                if (folga > 20) folga = 20; 
+                
+                let minL = Infinity, maxL = -1; 
+                let minC = Infinity, maxC = -1;
+                
+                // 1. Escaneia a tabela inteira para encontrar as 4 paredes do conteúdo
+                for (let r = 0; r < totalLinhas; r++) {
+                    const tr = tbody.children[r];
+                    for (let c = 0; c < totalColunas; c++) {
+                        if (tr.children[c + 1].innerText.trim() !== '') {
+                            if (r < minL) minL = r;
+                            if (r > maxL) maxL = r;
+                            if (c < minC) minC = c;
+                            if (c > maxC) maxC = c;
+                        }
+                    }
+                }
+                
+                // 2. Se houver algum texto na tabela, aplica o corte
+                if (maxL !== -1 && maxC !== -1) {
+                    // Calcula os limites reais adicionando a folga para os 4 lados
+                    let startRow = Math.max(0, minL - folga);
+                    let endRow = Math.min(totalLinhas - 1, maxL + folga);
+                    let startCol = Math.max(0, minC - folga);
+                    let endCol = Math.min(totalColunas - 1, maxC + folga);
+                    
+                    // Oculta tudo que estiver ANTES do teto ou DEPOIS do piso
+                    for (let r = 0; r < totalLinhas; r++) {
+                        if (r < startRow || r > endRow) {
+                            if (tbody.children[r]) {
+                                tbody.children[r].style.display = 'none';
+                                tbody.children[r].classList.add('export-crop-hide');
+                            }
+                        } else {
+                            // Para as linhas que sobreviveram, oculta as células ANTES da parede esquerda ou DEPOIS da parede direita
+                            for (let c = 0; c < totalColunas; c++) {
+                                if (c < startCol || c > endCol) {
+                                    if (tbody.children[r] && tbody.children[r].children[c + 1]) {
+                                        tbody.children[r].children[c + 1].style.display = 'none';
+                                        tbody.children[r].children[c + 1].classList.add('export-crop-hide');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Aplica o mesmo corte de parede esquerda e direita para os Cabeçalhos (A, B, C...)
+                    for (let c = 0; c < totalColunas; c++) {
+                        if (c < startCol || c > endCol) {
+                            if (theadTr.children[c + 1]) {
+                                theadTr.children[c + 1].style.display = 'none';
+                                theadTr.children[c + 1].classList.add('export-crop-hide');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- SISTEMA DE GERENCIAMENTO DOS BOTÕES ---
+        function atualizarEstadoBotoes() {
+            const travado = gradeBloqueada;
+
+            // --- NOVO: RADAR DE PLANILHA VAZIA ---
+            let planilhaVazia = true;
+            const tbody = document.getElementById('corpoTabela');
+            
+            // Só faz a varredura se a grade já estiver desbloqueada e renderizada
+            if (tbody && tbody.children.length > 0 && !travado) {
+                for (let r = 0; r < totalLinhas; r++) {
+                    const tr = tbody.children[r];
+                    if (!tr) continue;
+                    
+                    // Começa do índice c + 1 para ignorar a coluna de números (<th>)
+                    for (let c = 0; c < totalColunas; c++) {
+                        if (tr.children[c + 1] && tr.children[c + 1].innerText.trim() !== '') {
+                            planilhaVazia = false;
+                            break; // Achou texto! Para de procurar na linha.
+                        }
+                    }
+                    if (!planilhaVazia) break; // Achou texto! Para de procurar na tabela inteira.
+                }
+            }
+
+            // TRAVA MESTRA: Botões gerais ficam inativos se a grade estiver bloqueada
+            document.getElementById('btnSalvar').disabled = travado;
+            document.getElementById('btnConfig').disabled = travado;
+            document.getElementById('btnAddCol').disabled = travado;
+            document.getElementById('btnAddLinha').disabled = travado;
+
+            // TRAVA DUPLA: Imprimir e Screenshot travam se estiver bloqueada OU sem conteúdo
+            document.getElementById('btnImprimir').disabled = travado || planilhaVazia;
+            document.getElementById('btnScreenshot').disabled = travado || planilhaVazia;
+
+            const btnDesfazer = document.getElementById('btnDesfazer');
+            const btnRefazer = document.getElementById('btnRefazer');
+
+            if (travado) {
+                btnDesfazer.disabled = true;
+                btnRefazer.disabled = true;
+            } else {
+                btnDesfazer.disabled = (historicoPos <= 0);
+                btnRefazer.disabled = (historicoPos >= historico.length - 1);
+            }
+            
+            // Revalida as outras travas em cadeia
+            verificarRestricoesInterface();
+            verificarTravasDeEncolhimento();
+        }
+
+        // --- NOVO: TRAVA INTELIGENTE DE ENCOLHIMENTO ---
+        function verificarTravasDeEncolhimento() {
+            const btnRemoverCol = document.getElementById('btnRemoverCol');
+            const btnRemoverLinha = document.getElementById('btnRemoverLinha');
+            if (!btnRemoverCol || !btnRemoverLinha) return;
+
+            // TRAVA MESTRA: Trava os botões "-" completamente no início
+            if (gradeBloqueada) {
+                btnRemoverCol.disabled = true;
+                btnRemoverLinha.disabled = true;
+                return;
+            }
+
+            const tbody = document.getElementById('corpoTabela');
+            if (!tbody || tbody.children.length === 0) return;
+
+            // 1. Radar da Última Coluna
+            let ultimaColunaTemDados = false;
+            for (let r = 0; r < totalLinhas; r++) {
+                const tr = tbody.children[r];
+                if (tr && tr.children[totalColunas] && tr.children[totalColunas].innerText.trim() !== '') {
+                    ultimaColunaTemDados = true;
+                    break;
+                }
+            }
+            btnRemoverCol.disabled = ultimaColunaTemDados || (totalColunas <= 1);
+
+            // 2. Radar da Última Linha
+            let ultimaLinhaTemDados = false;
+            const ultimaTr = tbody.children[totalLinhas - 1]; 
+            if (ultimaTr) {
+                for (let c = 0; c < totalColunas; c++) {
+                    if (ultimaTr.children[c + 1] && ultimaTr.children[c + 1].innerText.trim() !== '') {
+                        ultimaLinhaTemDados = true;
+                        break;
+                    }
+                }
+            }
+            btnRemoverLinha.disabled = ultimaLinhaTemDados || (totalLinhas <= 1);
+        }
+
+        function abrirMenuNovo(e) {
+            e.stopPropagation(); // Impede que o clique feche o menu imediatamente
+            const btn = e.target;
+            const rect = btn.getBoundingClientRect();
+            const menu = document.getElementById('contextMenuNovo');
+            
+            // Posiciona o menu exatamente embaixo do botão "Novo"
+            menu.style.left = rect.left + 'px';
+            menu.style.top = rect.bottom + 'px';
+            menu.style.display = 'block';
+        }
+
+        function iniciarNovo(formatoEscolhido) {
+            // Esconde o menu flutuante imediatamente após o utilizador clicar numa opção
+            document.getElementById('contextMenuNovo').style.display = 'none';
+
+            if (historicoPos > 0) {
+                const confirmacao = confirm("ATENÇÃO: Existem alterações nesta planilha!\n\nSe você continuar, todos os dados atuais serão perdidos.\nDeseja salvar, imprimir ou capturar a tela (Screenshot) antes de criar uma nova planilha?\n\nClique em [OK] para DESCARTAR tudo ou [Cancelar] para voltar.");
+                if (!confirmacao) return;
+            }
+            
+            // DESBLOQUEIA A GRADE PARA USO
+            gradeBloqueada = false;
+            document.getElementById('welcomeOverlay').style.display = 'none'; // FAZ A JANELA SUMIR
+            
+            totalColunas = Math.max(15, baseColunasTela);
+            totalLinhas = Math.max(30, baseLinhasTela);
+            
+            // Aplica o formato exato que veio do menu
+            formatoAtual = formatoEscolhido; 
+            
+            inicializarPlanilhaNativa();
+            
+            // Mapeia o nome de exibição de acordo com o formato escolhido no Conjunto 3
+            let nomeExibicao = "";
+            if (formatoEscolhido === 'csv_global') nomeExibicao = 'Padrão Internacional';
+            else if (formatoEscolhido === 'csv') nomeExibicao = 'Padrão Regional';
+            else if (formatoEscolhido === 'tsv') nomeExibicao = 'Padrão Tabulado';
+            else if (formatoEscolhido === 'pipe') nomeExibicao = 'Padrão Corporativo';
+            
+            document.getElementById('appTitle').innerText = 'SimpleSheet - Nova_Planilha (' + nomeExibicao + ')';
+            
+            historico = []; historicoPos = -1;
+            salvarEstado();
+        }
+
+        // --- SISTEMA DE HISTÓRICO AVANÇADO ---
+        const MAX_HISTORICO = 50;
+        let historico = [];
+        let historicoPos = -1;
+        let valorPreEdicao = "";
+
+        function getSnapshot() {
+            const data = [];
+            const tbody = document.getElementById('corpoTabela');
+            for (let r = 0; r < totalLinhas; r++) {
+                const rowData = []; const tr = tbody.children[r];
+                for (let c = 0; c < totalColunas; c++) { rowData.push(tr.children[c + 1].innerText); }
+                data.push(rowData);
+            }
+            return {
+                r: totalLinhas, c: totalColunas, d: data,
+                selR: celulaAtual ? currentRow : -1, selC: celulaAtual ? currentCol : -1
+            };
+        }
+
+        function applySnapshot(snap) {
+            sairModoEdicao();
+            totalLinhas = snap.r; totalColunas = snap.c;
+            inicializarPlanilhaNativa(); 
+            const tbody = document.getElementById('corpoTabela');
+            for (let r = 0; r < totalLinhas; r++) {
+                const tr = tbody.children[r];
+                for (let c = 0; c < totalColunas; c++) { tr.children[c + 1].innerText = snap.d[r][c]; }
+            }
+            if (snap.selR >= 0 && snap.selR < totalLinhas && snap.selC >= 0 && snap.selC < totalColunas) {
+                selecionarUmaCelula(tbody.children[snap.selR].children[snap.selC + 1]);
+            } else {
+                celulaAtual = null; clearSelection(); atualizarMirasVisuais(null);
+            }
+            atualizarEstadoBotoes();
+        }
+
+        function salvarEstado() {
+            historico = historico.slice(0, historicoPos + 1);
+            historico.push(getSnapshot());
+            historicoPos++;
+            if (historico.length > MAX_HISTORICO) { historico.shift(); historicoPos--; }
+            atualizarEstadoBotoes();
+        }
+
+        function acaoDesfazer() {
+            if (isEditing) { document.execCommand('undo'); return; }
+            if (historicoPos > 0) { historicoPos--; applySnapshot(historico[historicoPos]); }
+        }
+
+        function acaoRefazer() {
+            if (isEditing) { document.execCommand('redo'); return; }
+            if (historicoPos < historico.length - 1) { historicoPos++; applySnapshot(historico[historicoPos]); }
+        }
+
+        // --- CONTROLE DE TAMANHO DA GRADE ---
+        function adicionarUltimaColuna(gravarHistorico = true) {
+            const theadTr = document.getElementById('cabecalhoColunas').firstElementChild;
+            const th = document.createElement('th'); th.innerText = numeroParaLetra(totalColunas); theadTr.appendChild(th);
+            const tbody = document.getElementById('corpoTabela');
+            for (let i = 0; i < tbody.children.length; i++) tbody.children[i].appendChild(document.createElement('td'));
+            totalColunas++; ajustarZoomDinamico();
+            if (gravarHistorico) salvarEstado();
+        }
+
+        function removerUltimaColuna() {
+            if (totalColunas <= 1) return alert("Mínimo de 1 coluna.");
+            sairModoEdicao();
+            document.getElementById('cabecalhoColunas').firstElementChild.deleteCell(-1);
+            const tbody = document.getElementById('corpoTabela');
+            for (let i = 0; i < tbody.children.length; i++) tbody.children[i].deleteCell(-1);
+            totalColunas--; ajustarZoomDinamico();
+            if (currentCol >= totalColunas) moverSelecao(0, -1);
+            salvarEstado();
+        }
+
+        function adicionarUltimaLinha(gravarHistorico = true) {
+            totalLinhas++;
+            const tbody = document.getElementById('corpoTabela');
+            const tr = document.createElement('tr');
+            const thRow = document.createElement('th'); thRow.innerText = totalLinhas; thRow.style.width = '30px'; tr.appendChild(thRow);
+            for (let c = 0; c < totalColunas; c++) tr.appendChild(document.createElement('td'));
+            tbody.appendChild(tr);
+            if (gravarHistorico) salvarEstado();
+        }
+
+        function removerUltimaLinha() {
+            if (totalLinhas <= 1) return alert("Mínimo de 1 linha.");
+            sairModoEdicao();
+            document.getElementById('corpoTabela').deleteRow(-1);
+            totalLinhas--;
+            if (currentRow >= totalLinhas) moverSelecao(-1, 0);
+            salvarEstado();
+        }
+
+        // --- LÓGICA ESTRUTURAL ---
+        function acaoEstrutural(tipo, acao) {
+            contextMenuCabecalho.style.display = 'none';
+            sairModoEdicao();
+            const tbody = document.getElementById('corpoTabela');
+            const theadTr = document.getElementById('cabecalhoColunas').firstElementChild;
+
+            if (tipo === 'col') {
+                if (acao === 'limpar') {
+                    for (let i = 0; i < tbody.children.length; i++) tbody.children[i].children[targetMenuIndex].innerText = '';
+                } 
+                else if (acao === 'apagar') {
+                    if (totalColunas <= 1) return alert("Não é possível apagar a última coluna.");
+                    theadTr.deleteCell(targetMenuIndex);
+                    for (let i = 0; i < tbody.children.length; i++) tbody.children[i].deleteCell(targetMenuIndex);
+                    totalColunas--; recalcularNumerosELetras(); ajustarZoomDinamico();
+                } 
+                else if (acao === 'inserirEsq' || acao === 'inserirDir') {
+                    const insertIdx = (acao === 'inserirEsq') ? targetMenuIndex : targetMenuIndex + 1;
+                    const th = document.createElement('th'); theadTr.insertBefore(th, theadTr.children[insertIdx]);
+                    for (let i = 0; i < tbody.children.length; i++) tbody.children[i].insertBefore(document.createElement('td'), tbody.children[i].children[insertIdx]);
+                    totalColunas++; recalcularNumerosELetras(); ajustarZoomDinamico();
+                }
+            } 
+            else if (tipo === 'row') {
+                if (acao === 'limpar') {
+                    const tds = tbody.children[targetMenuIndex].querySelectorAll('td');
+                    tds.forEach(td => td.innerText = '');
+                } 
+                else if (acao === 'apagar') {
+                    if (totalLinhas <= 1) return alert("Não é possível apagar a última linha.");
+                    tbody.deleteRow(targetMenuIndex);
+                    totalLinhas--; recalcularNumerosELetras();
+                } 
+                else if (acao === 'inserirAcima' || acao === 'inserirAbaixo') {
+                    const insertIdx = (acao === 'inserirAcima') ? targetMenuIndex : targetMenuIndex + 1;
+                    const tr = tbody.insertRow(insertIdx);
+                    const thRow = document.createElement('th'); thRow.style.width = '30px'; tr.appendChild(thRow);
+                    for (let c = 0; c < totalColunas; c++) tr.appendChild(document.createElement('td'));
+                    totalLinhas++; recalcularNumerosELetras();
+                }
+            }
+            salvarEstado(); 
+        }
+
+        // --- COLAGEM EM MATRIZ ---
+        function processarColagem(texto) {
+            if (!celulaAtual) return;
+            if (isEditing) {
+                document.execCommand('insertText', false, texto);
+            } else {
+                let linhas = texto.replace(/\r\n/g, '\n').split('\n');
+                if (linhas[linhas.length - 1] === '') linhas.pop();
+                let inicioRow = currentRow; let inicioCol = currentCol;
+                const tbody = document.getElementById('corpoTabela');
+
+                for (let i = 0; i < linhas.length; i++) {
+                    let colunas = linhas[i].split('\t'); 
+                    while (inicioRow + i >= totalLinhas) adicionarUltimaLinha(false);
+                    for (let j = 0; j < colunas.length; j++) {
+                        while (inicioCol + j >= totalColunas) adicionarUltimaColuna(false);
+                        const tr = tbody.children[inicioRow + i];
+                        const td = tr.children[inicioCol + j + 1]; td.innerText = colunas[j];
+                    }
+                }
+                salvarEstado(); 
+            }
+        }
+
+        document.addEventListener('paste', function(e) {
+            e.preventDefault();
+            let pasteData = (e.clipboardData || window.clipboardData).getData('text/plain');
+            processarColagem(pasteData);
+        });
+
+        async function acaoColarInterface() {
+            contextMenuCelula.style.display = 'none';
+            if (!celulaAtual) return;
+            try { const texto = await navigator.clipboard.readText(); processarColagem(texto); } catch (err) { alert("Use Ctrl+V."); }
+        }
+
+        async function acaoCopiar() {
+            contextMenuCelula.style.display = 'none';
+            if (selectedCells.length === 0) return;
+            
+            if (isEditing && celulaAtual) {
+                document.execCommand('copy');
+                return;
+            }
+
+            let minR = Infinity, maxR = -1;
+            let minC = Infinity, maxC = -1;
+            selectedCells.forEach(td => {
+                let pos = getRowCol(td);
+                if (pos.r < minR) minR = pos.r;
+                if (pos.r > maxR) maxR = pos.r;
+                if (pos.c < minC) minC = pos.c;
+                if (pos.c > maxC) maxC = pos.c;
+            });
+
+            const tbody = document.getElementById('corpoTabela');
+            let linhasTexto = [];
+            for (let r = minR; r <= maxR; r++) {
+                let tr = tbody.children[r];
+                let linhaCells = [];
+                for (let c = minC; c <= maxC; c++) {
+                    linhaCells.push(tr.children[c + 1].innerText);
+                }
+                linhasTexto.push(linhaCells.join('\t')); 
+            }
+            let textoClipboard = linhasTexto.join('\n'); 
+
+            try {
+                await navigator.clipboard.writeText(textoClipboard);
+            } catch (err) {
+                alert("Erro ao acessar a área de transferência.");
+            }
+        }
+
+        async function acaoRecortar() {
+            if (selectedCells.length === 0) return;
+            if (isEditing && celulaAtual) {
+                document.execCommand('cut');
+                return;
+            }
+
+            await acaoCopiar();
+            selectedCells.forEach(td => { td.innerText = ""; });
+            salvarEstado();
+        }
+
+        function acaoRecortarMenuContexto() { contextMenuCelula.style.display = 'none'; acaoRecortar(); }
+
+        // --- INTERCEPTADOR DOS MENUS DE CONTEXTO ---
+        const contextMenuCabecalho = document.getElementById('contextMenuCabecalho');
+        const contextMenuCelula = document.getElementById('contextMenuCelula');
+        const menuCol = document.getElementById('menuCol');
+        const menuRow = document.getElementById('menuRow');
+
+        document.getElementById('planilha').addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
+
+            contextMenuCabecalho.style.display = 'none';
+            contextMenuCelula.style.display = 'none';
+
+            if (e.target.tagName === 'TH' && !e.target.classList.contains('corner')) {
+                const tr = e.target.parentElement;
+                contextMenuCabecalho.style.display = 'block';
+                contextMenuCabecalho.style.left = e.clientX + 'px';
+                contextMenuCabecalho.style.top = e.clientY + 'px';
+
+                if (tr.parentElement.tagName === 'THEAD') {
+                    targetMenuIndex = e.target.cellIndex;
+                    menuCol.style.display = 'block'; menuRow.style.display = 'none';
+                } else {
+                    targetMenuIndex = tr.rowIndex - 1;
+                    menuRow.style.display = 'block'; menuCol.style.display = 'none';
+                }
+                sairModoEdicao();
+                clearSelection();
+                e.target.classList.add('header-highlight');
+            } 
+            else if (e.target.tagName === 'TD') {
+                if (!selectedCells.includes(e.target)) {
+                    selecionarUmaCelula(e.target);
+                }
+
+                let isRegular = checkSelectionRegularity();
+                const mCopiar = document.getElementById('ctxCopiar');
+                const mRecortar = document.getElementById('ctxRecortar');
+                const mColar = document.getElementById('ctxColar');
+
+                if (isRegular) {
+                    mCopiar.classList.remove('disabled');
+                    mRecortar.classList.remove('disabled');
+                    mColar.classList.remove('disabled');
+                } else {
+                    mCopiar.classList.add('disabled');
+                    mRecortar.classList.add('disabled');
+                    mColar.classList.add('disabled');
+                }
+
+                contextMenuCelula.style.display = 'block';
+                contextMenuCelula.style.left = e.clientX + 'px';
+                contextMenuCelula.style.top = e.clientY + 'px';
+            }
+        });
+
+        document.addEventListener('click', function(e) { 
+            if (e.button !== 2) {
+                contextMenuCabecalho.style.display = 'none'; contextMenuCelula.style.display = 'none';
+                document.getElementById('contextMenuNovo').style.display = 'none';
+            }
+        });
+
+        // --- SISTEMA DE GESTÃO DO MOUSE ---
+        const tabela = document.getElementById('planilha');
+
+        tabela.addEventListener('mousedown', function(e) {
+            if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
+            if (e.target.tagName === 'TD') {
+                if (e.button === 2) return;
+                if (isEditing && celulaAtual === e.target) return;
+                
+                sairModoEdicao();
+                isDragging = true;
+                let pos = getRowCol(e.target);
+                dragStartRow = pos.r;
+                dragStartCol = pos.c;
+
+                if (e.ctrlKey) {
+                    if (selectedCells.includes(e.target)) {
+                        e.target.classList.remove('selected');
+                        selectedCells = selectedCells.filter(c => c !== e.target);
+                    } else {
+                        if(celulaAtual) celulaAtual.classList.remove('active-focus');
+                        celulaAtual = e.target;
+                        celulaAtual.classList.add('active-focus');
+                        e.target.classList.add('selected');
+                        selectedCells.push(e.target);
+                        currentRow = pos.r; currentCol = pos.c;
+                        valorPreEdicao = celulaAtual.innerText;
+                    }
+                    verificarRestricoesInterface();
+                } else {
+                    selecionarUmaCelula(e.target);
+                }
+                atualizarMirasVisuais(e.target);
+            }
+        });
+
+        tabela.addEventListener('mouseover', function(e) {
+            if (isDragging && e.target.tagName === 'TD') {
+                let pos = getRowCol(e.target);
+                if (!e.ctrlKey) {
+                    selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, false);
+                } else {
+                    selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, true);
+                }
+                atualizarMirasVisuais(e.target);
+            }
+        });
+
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+
+        tabela.addEventListener('dblclick', function(e) { 
+            if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
+            if (e.target.tagName === 'TD') entrarModoEdicao(e.target); 
+        });
+
+        // --- GERENCIADOR DE EVENTOS DE TECLADO ---
+        document.addEventListener('keydown', function(e) {
+            if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
+            
+            if (e.ctrlKey) {
+                if (e.key.toLowerCase() === 'c') { if(checkSelectionRegularity()) acaoCopiar(); return; }
+                if (e.key.toLowerCase() === 'x') { if(checkSelectionRegularity()) acaoRecortar(); return; }
+                if (e.key.toLowerCase() === 'z') { if(!isEditing) { e.preventDefault(); acaoDesfazer(); } return; }
+                if (e.key.toLowerCase() === 'y') { if(!isEditing) { e.preventDefault(); acaoRefazer(); } return; }
+            }
+
+            if (!celulaAtual) return;
+
+            if (isEditing) {
+                if (e.key === 'Enter') { 
+                    e.preventDefault(); 
+                    if (selectedCells.length > 1) {
+                        sairModoEdicao(); 
+                        avancarCarrosselEdicao(true); 
+                    } else {
+                        sairModoEdicao(); 
+                        moverSelecao(1, 0); 
+                    }
+                }
+                if (e.key === 'Escape') { celulaAtual.innerText = valorPreEdicao; sairModoEdicao(true); } 
+                return;
+            }
+
+            let deltaL = 0; let deltaC = 0;
+            switch(e.key) {
+                case 'ArrowUp': deltaL = -1; e.preventDefault(); break;
+                case 'ArrowDown': deltaL = 1; e.preventDefault(); break;
+                case 'ArrowLeft': deltaC = -1; e.preventDefault(); break;
+                case 'ArrowRight': deltaC = 1; e.preventDefault(); break;
+                case 'Enter': 
+                    e.preventDefault(); 
+                    if (selectedCells.length > 1) {
+                        avancarCarrosselEdicao(false); 
+                    } else {
+                        deltaL = 1; 
+                    }
+                    break;
+                case 'F2': e.preventDefault(); entrarModoEdicao(celulaAtual); break;
+                case 'Backspace': case 'Delete': apagarConteudoSelecao(); break;
+                default:
+                    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                        celulaAtual.innerText = ''; entrarModoEdicao(celulaAtual);
+                    }
+                    break;
+            }
+            if (deltaL !== 0 || deltaC !== 0) moverSelecao(deltaL, deltaC);
+        });
+
+        function entrarModoEdicao(td) {
+            isEditing = true;
+            td.classList.remove('active-focus'); 
+            td.classList.add('editing');
+            td.contentEditable = "true";
+            td.focus();
+            if (td.innerText.length > 0) {
+                const range = document.createRange(); const sel = window.getSelection();
+                range.selectNodeContents(td); range.collapse(false);
+                sel.removeAllRanges(); sel.addRange(range);
+            }
+        }
+
+        function sairModoEdicao(foiCancelado = false) {
+            if (isEditing && celulaAtual) {
+                isEditing = false;
+                celulaAtual.contentEditable = "false";
+                celulaAtual.classList.remove('editing');
+                celulaAtual.classList.add('active-focus');
+                celulaAtual.blur();
+                if (!foiCancelado && celulaAtual.innerText !== valorPreEdicao) salvarEstado();
+            }
+        }
+
+        function moverSelecao(deltaL, deltaC) {
+            const novaL = currentRow + deltaL; const novaC = currentCol + deltaC;
+            if (novaL >= 0 && novaL < totalLinhas && novaC >= 0 && novaC < totalColunas) {
+                const tr = document.getElementById('corpoTabela').children[novaL];
+                selecionarUmaCelula(tr.children[novaC + 1]);
+            }
+        }
+
+        function atualizarMirasVisuais(td) {
+            document.querySelectorAll('.header-highlight').forEach(el => el.classList.remove('header-highlight'));
+            if (!td) return;
+            const thLetra = document.getElementById('cabecalhoColunas').firstElementChild.children[td.cellIndex];
+            if (thLetra) thLetra.classList.add('header-highlight');
+            const thNumero = td.parentElement.firstElementChild;
+            if (thNumero) thNumero.classList.add('header-highlight');
+        }
+
+        function recalcularNumerosELetras() {
+            const theadTr = document.getElementById('cabecalhoColunas').firstElementChild;
+            for (let c = 1; c <= totalColunas; c++) theadTr.children[c].innerText = numeroParaLetra(c - 1);
+            const tbody = document.getElementById('corpoTabela');
+            for (let l = 0; l < totalLinhas; l++) tbody.children[l].firstElementChild.innerText = l + 1;
+        }
+
+        function numeroParaLetra(num) {
+            let letra = '';
+            while (num >= 0) { letra = String.fromCharCode(num % 26 + 65) + letra; num = Math.floor(num / 26) - 1; }
+            return letra;
+        }
+
+        function inicializarPlanilhaNativa() {
+            const thead = document.getElementById('cabecalhoColunas'); const tbody = document.getElementById('corpoTabela');
+            thead.innerHTML = ''; tbody.innerHTML = '';
+            const trTopo = document.createElement('tr'); const corner = document.createElement('th');
+            corner.className = 'corner'; trTopo.appendChild(corner);
+            for (let c = 0; c < totalColunas; c++) {
+                const th = document.createElement('th'); th.innerText = numeroParaLetra(c); trTopo.appendChild(th);
+            }
+            thead.appendChild(trTopo);
+            for (let l = 1; l <= totalLinhas; l++) {
+                const tr = document.createElement('tr');
+                const thRow = document.createElement('th'); thRow.innerText = l; thRow.style.width = '30px'; tr.appendChild(thRow);
+                for (let c = 0; c < totalColunas; c++) tr.appendChild(document.createElement('td'));
+                tbody.appendChild(tr);
+            }
+            ajustarZoomDinamico();
+        }
+
+        // --- NOVO: MÁQUINA DE ESTADOS PARA LEITURA DE CSV E TSV (PARSER LÉXICO) ---
+        // Este algoritmo lê o arquivo perfeitamente, respeitando regras de cada formato
+        function parseCSV(text, separator) {
+            let rows = [];
+            let currentRow = [];
+            let currentCell = '';
+            let inQuotes = false;
+            
+            // Remove a marca BOM invisível (caso o Excel tenha salvo com ela)
+            if (text.charCodeAt(0) === 0xFEFF) {
+                text = text.slice(1);
+            }
+
+            // Descobre se estamos processando um formato "bruto" que não usa aspas (TSV ou Pipe)
+            const isFormatoBruto = separator === '\t' || separator === '|';
+
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                let nextChar = text[i + 1];
+                
+                // Formato Bruto (TSV ou Enterprise Pipe): Ignora a complexidade das aspas e vai direto na quebra.
+                if (isFormatoBruto) {
+                    if (c === separator) {
+                        currentRow.push(currentCell);
+                        currentCell = '';
+                    } else if (c === '\n' || c === '\r') {
+                        if (c === '\r' && nextChar === '\n') i++; 
+                        currentRow.push(currentCell);
+                        rows.push(currentRow);
+                        currentRow = [];
+                        currentCell = '';
+                    } else {
+                        currentCell += c;
+                    }
+                    continue; // Pula o resto da lógica complexa de CSV
+                }
+
+                // Lógica oficial para CSV (com regras de aspas)
+                if (inQuotes) {
+                    // Trata aspas duplicadas ("") como uma única aspa literal
+                    if (c === '"' && nextChar === '"') {
+                        currentCell += '"';
+                        i++; // Pula o próximo caractere pois já foi lido
+                    } else if (c === '"') {
+                        // Encontrou a aspa final: desliga a segurança
+                        inQuotes = false;
+                    } else {
+                        // Ainda protegido pelas aspas: salva tudo (inclusive \n e ponto e vírgula)
+                        currentCell += c;
+                    }
+                } else {
+                    if (c === '"') {
+                        // Encontrou uma aspa de abertura: liga a segurança
+                        inQuotes = true;
+                    } else if (c === separator) {
+                        // Separador real: guarda a célula e limpa para a próxima
+                        currentRow.push(currentCell);
+                        currentCell = '';
+                    } else if (c === '\n' || c === '\r') {
+                        // Quebra de linha real de final de fileira
+                        if (c === '\r' && nextChar === '\n') i++; 
+                        currentRow.push(currentCell);
+                        rows.push(currentRow);
+                        currentRow = [];
+                        currentCell = '';
+                    } else {
+                        // Letra normal
+                        currentCell += c;
+                    }
+                }
+            }
+            
+            // Grava a última célula e última fileira no final do loop
+            currentRow.push(currentCell);
+            rows.push(currentRow);
+            return rows;
+        }
+
+        function importarCSV(evento) {
+            const arquivo = evento.target.files[0]; 
+            if (!arquivo) return;
+            
+            const leitor = new FileReader();
+            leitor.onload = function(e) {
+                const textoOriginal = e.target.result;
+                
+                // --- INTELIGÊNCIA: TORNEIO DE INTEGRIDADE (100% Infalível) ---
+                // Para não travar o PC do usuário, analisamos até as primeiras 100 linhas.
+                const amostra = textoOriginal.split('\n').slice(0, 100).join('\n');
+                
+                // O motor léxico tenta ler a amostra com os 4 formatos possíveis
+                const matrizGlobal = parseCSV(amostra, SEPARADOR_GLOBAL);
+                const matrizRegional = parseCSV(amostra, SEPARADOR_CSV);
+                const matrizTSV = parseCSV(amostra, SEPARADOR_TSV);
+                const matrizPipe = parseCSV(amostra, SEPARADOR_PIPE);
+
+                // Função juíza: Dá uma nota baseada na perfeição da tabela gerada
+                function calcularPontuacao(matriz) {
+                    if (matriz.length === 0) return 0;
+                    const colunasBase = matriz[0].length;
+                    if (colunasBase <= 1) return 0; // Formatos que não separaram nada ganham zero
+                    let linhasPerfeitas = 0;
+                    matriz.forEach(linha => { if (linha.length === colunasBase) linhasPerfeitas++; });
+                    // % de perfeição multiplicada pelo número de colunas
+                    return (linhasPerfeitas / matriz.length) * colunasBase; 
+                }
+
+                const ptsGlobal = calcularPontuacao(matrizGlobal);
+                const ptsRegional = calcularPontuacao(matrizRegional);
+                const ptsTSV = calcularPontuacao(matrizTSV);
+                const ptsPipe = calcularPontuacao(matrizPipe);
+
+                let separadorDefinido = SEPARADOR_CSV;
+                const vencedor = Math.max(ptsGlobal, ptsRegional, ptsTSV, ptsPipe);
+
+                // Define o formato com base no campeão matemático
+                if (vencedor === 0) { formatoAtual = 'csv'; separadorDefinido = SEPARADOR_CSV; }
+                else if (vencedor === ptsGlobal) { formatoAtual = 'csv_global'; separadorDefinido = SEPARADOR_GLOBAL; }
+                else if (vencedor === ptsRegional) { formatoAtual = 'csv'; separadorDefinido = SEPARADOR_CSV; }
+                else if (vencedor === ptsTSV) { formatoAtual = 'tsv'; separadorDefinido = SEPARADOR_TSV; }
+                else if (vencedor === ptsPipe) { formatoAtual = 'pipe'; separadorDefinido = SEPARADOR_PIPE; }
+                
+                // Passa o separador vencedor definitivo para a leitura do arquivo completo
+                const linhas = parseCSV(textoOriginal, separadorDefinido);
+                
+                while(linhas.length > 0 && linhas[linhas.length-1].length === 1 && linhas[linhas.length-1][0].trim() === '') {
+                    linhas.pop();
+                }
+
+                if (linhas.length === 0) return;
+                
+                let maxColunasCSV = 0;
+                linhas.forEach(linha => { 
+                    if (linha.length > maxColunasCSV) maxColunasCSV = linha.length; 
+                });
+                
+                // --- RESILIÊNCIA DE GRADE BASE (PISO DO TAMANHO DA TELA) ---
+                // Compara o arquivo com o tamanho inicial da tela (baseColunasTela e baseLinhasTela).
+                // Se o arquivo for menor, mantém o tamanho da tela. Se for maior, a planilha cresce.
+                totalColunas = Math.max(baseColunasTela, maxColunasCSV + 2); 
+                totalLinhas = Math.max(baseLinhasTela, linhas.length + 5); 
+                
+                gradeBloqueada = false; // <--- ADICIONE ESTA LINHA AQUI PARA DESBLOQUEAR AO ABRIR
+                document.getElementById('welcomeOverlay').style.display = 'none'; // FAZ A JANELA SUMIR
+                
+                inicializarPlanilhaNativa();
+                const tableRows = document.querySelectorAll("#corpoTabela tr");
+                
+                linhas.forEach((linha, i) => {
+                    const tdElements = tableRows[i]?.querySelectorAll("td");
+                    linha.forEach((dado, j) => { 
+                        if (tdElements?.[j]) {
+                            tdElements[j].innerText = dado; 
+                        }
+                    });
+                });
+                
+                let nomeLimpo = arquivo.name.replace(/\.[^/.]+$/, "");
+                document.getElementById('appTitle').innerText = 'SimpleSheet - ' + nomeLimpo;
+                
+                historico = []; historicoPos = -1; salvarEstado();
+            };
+            leitor.readAsText(arquivo); 
+            evento.target.value = ''; 
+        }
+
+        // --- INTERFACE DE SALVAMENTO HÍBRIDO ATUALIZADA (CSV, TSV & PIPE) ---
+        async function exportarCSV() {
+            sairModoEdicao();
+            const linhas = document.querySelectorAll("#corpoTabela tr");
+            let maxColuna = -1; let maxLinha = -1;
+            
+            for (let i = 0; i < linhas.length; i++) {
+                const celulas = linhas[i].querySelectorAll("td");
+                for (let j = 0; j < celulas.length; j++) {
+                    let texto = celulas[j].innerText.trim();
+                    if (texto !== "") { if (j > maxColuna) maxColuna = j; if (i > maxLinha) maxLinha = i; }
+                }
+            }
+            
+            if (maxLinha === -1) return alert("A planilha está vazia!");
+            
+            let exportData = [];
+            
+            const separador = formatoAtual === 'tsv' ? SEPARADOR_TSV : 
+                              (formatoAtual === 'pipe' ? SEPARADOR_PIPE : 
+                              (formatoAtual === 'csv_global' ? SEPARADOR_GLOBAL : SEPARADOR_CSV));
+                              
+            const extensao = formatoAtual === 'tsv' ? '.tsv' : '.csv';
+            const mimeType = formatoAtual === 'tsv' ? 'text/tab-separated-values' : 'text/csv';
+            
+            for (let i = 0; i <= maxLinha; i++) {
+                let linea = []; 
+                const celulas = linhas[i].querySelectorAll("td");
+                for (let j = 0; j <= maxColuna; j++) {
+                    let textoPuro = celulas[j].innerText;
+                    
+                    if (formatoAtual === 'csv' || formatoAtual === 'csv_global') {
+                        let textoEscapado = textoPuro.replace(/"/g, '""');
+                        linea.push('"' + textoEscapado + '"');
+                    } else {
+                        let textoLimpo = textoPuro.replace(/(\r\n|\n|\r)/gm, " ");
+                        if (separador === '\t') textoLimpo = textoLimpo.replace(/\t/g, " ");
+                        if (separador === '|') textoLimpo = textoLimpo.replace(/\|/g, " ");
+                        linea.push(textoLimpo);
+                    }
+                }
+                exportData.push(linea.join(separador));
+            }
+            
+            const stringFinal = exportData.join("\r\n");
+            const nomeArquivoSugerido = document.getElementById('appTitle').innerText.replace('SimpleSheet - ', '') + extensao;
+
+            try {
+                if (window.showSaveFilePicker) {
+                    const opcoesConfig = {
+                        suggestedName: nomeArquivoSugerido,
+                        types: [{ description: `Arquivo Exportado (${formatoAtual.toUpperCase()})`, accept: { [mimeType]: [extensao] } }],
+                    };
+
+                    if (ultimoFileHandle) {
+                        opcoesConfig.startIn = ultimoFileHandle;
+                    }
+
+                    const handle = await window.showSaveFilePicker(opcoesConfig);
+                    ultimoFileHandle = handle;
+
+                    const writable = await handle.createWritable();
+                    await writable.write("\ufeff" + stringFinal); 
+                    await writable.close(); 
+                    return; 
+                } else { throw new Error(); }
+            } catch (erro) {
+                // Se o erro foi porque o usuário clicou em "Cancelar" na janela do Windows, apenas interrompe.
+                if (erro.name === 'AbortError') return;
+                
+                // --- NOVO: PLANO B (FALLBACK COM PERGUNTA DE NOME) ---
+                // Retira a extensão (.csv) para não confundir o usuário na hora de digitar
+                let nomeSemExtensao = nomeArquivoSugerido.replace(extensao, '');
+                
+                // Abre a janela de pergunta pré-preenchida
+                let nomeEscolhido = prompt("Digite o nome para salvar o arquivo:", nomeSemExtensao);
+                
+                // Se o usuário clicar em "Cancelar" na janelinha ou deixar o texto vazio, aborta o salvamento
+                if (nomeEscolhido === null || nomeEscolhido.trim() === "") return;
+                
+                // Devolve a extensão ao final do nome que o usuário escolheu
+                let nomeFinal = nomeEscolhido.trim() + extensao;
+
+                const blob = new Blob(["\ufeff" + stringFinal], { type: `${mimeType};charset=utf-8;` });
+                const url = URL.createObjectURL(blob); 
+                const link = document.createElement("a");
+                link.href = url; link.download = nomeFinal; link.click(); URL.revokeObjectURL(url);
+            }
+        }
+
+        async function acaoScreenshot() {
+            sairModoEdicao();
+            let cacheSelection = [...selectedCells];
+            if (celulaAtual) celulaAtual.classList.remove('active-focus');
+            clearSelection();
+            
+            // DESLIGA A MIRA (Remove o destaque das letras e números)
+            atualizarMirasVisuais(null); 
+            
+            toggleExportLayout(true);
+            try {
+                const canvas = await html2canvas(document.getElementById('planilha'));
+                toggleExportLayout(false);
+                const defaultName = document.getElementById('appTitle').innerText.replace('SimpleSheet - ', '') + '.png';
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                try {
+                    if (window.showSaveFilePicker) {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: defaultName,
+                            types: [{ description: 'Imagem PNG', accept: { 'image/png': ['.png'] } }],
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(blob); await writable.close();
+                    } else { throw new Error(); }
+                } catch (erro) {
+                    if (erro.name === 'AbortError') { restabelecerCache(); return; }
+                    
+                    // --- NOVO: PLANO B PARA A IMAGEM (FALLBACK COM PERGUNTA DE NOME) ---
+                    let nomeSemExtensao = defaultName.replace('.png', '');
+                    let nomeEscolhido = prompt("Digite o nome para salvar a imagem:", nomeSemExtensao);
+                    
+                    if (nomeEscolhido === null || nomeEscolhido.trim() === "") { 
+                        restabelecerCache(); 
+                        return; 
+                    }
+                    
+                    let nomeFinal = nomeEscolhido.trim() + '.png';
+                    
+                    const url = URL.createObjectURL(blob); const link = document.createElement('a');
+                    link.href = url; link.download = nomeFinal; link.click(); URL.revokeObjectURL(url);
+                }
+            } catch (err) { toggleExportLayout(false); alert("Erro ao capturar imagem."); }
+            restabelecerCache();
+
+            function restabelecerCache() {
+                selectedCells = cacheSelection;
+                selectedCells.forEach(c => c.classList.add('selected'));
+                if (celulaAtual) celulaAtual.classList.add('active-focus');
+                
+                // RELIGA A MIRA (Devolve o destaque para a posição original)
+                atualizarMirasVisuais(celulaAtual); 
+                verificarRestricoesInterface(); 
+            }
+        }
+
+        function imprimir() { 
+            sairModoEdicao();
+            let cacheSelection = [...selectedCells];
+            if (celulaAtual) celulaAtual.classList.remove('active-focus');
+            clearSelection();
+            
+            // DESLIGA A MIRA (Remove o destaque das letras e números)
+            atualizarMirasVisuais(null); 
+            
+            toggleExportLayout(true);
+            window.print();
+            toggleExportLayout(false);
+            
+            selectedCells = cacheSelection;
+            selectedCells.forEach(c => c.classList.add('selected'));
+            if (celulaAtual) celulaAtual.classList.add('active-focus');
+            
+            // RELIGA A MIRA (Devolve o destaque para a posição original)
+            atualizarMirasVisuais(celulaAtual); 
+            verificarRestricoesInterface();
+        }
+
+        window.onload = function() { 
+            // 1. Captura a área cinza onde a grade será desenhada
+            const container = document.getElementById('gridContainer');
+            
+            if (container) {
+                // 2. Descobre o espaço físico real disponível (em pixels)
+                const larguraDisponivel = container.clientWidth;
+                const alturaDisponivel = container.clientHeight;
+
+                // 3. Calcula quantas colunas cabem (descontando 30px da lateral / 80px por coluna)
+                const colunasCalculadas = Math.floor((larguraDisponivel - 30) / 80);
+
+                // 4. Calcula quantas linhas cabem (descontando 20px do topo / 20px por linha)
+                const linhasCalculadas = Math.floor((alturaDisponivel - 20) / 20);
+
+                // 5. Atualiza as variáveis globais (com uma trava de segurança mínima de 5x10 para telas minúsculas)
+                totalColunas = Math.max(5, colunasCalculadas);
+                totalLinhas = Math.max(10, linhasCalculadas);
+				
+				// NOVO: Salva esse cálculo como o "Piso" inquebrável
+                baseColunasTela = totalColunas;
+                baseLinhasTela = totalLinhas;
+				
+            }
+
+            // 6. Inicia a planilha com as medidas exatas do monitor do usuário
+            inicializarPlanilhaNativa(); 
+            salvarEstado(); 
+        };
+    </script>
+</body>
+</html>
