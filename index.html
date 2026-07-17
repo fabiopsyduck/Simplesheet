@@ -240,7 +240,43 @@
         table.export-hide-grid td { border-color: transparent !important; }
         table.export-hide-headers thead { display: none !important; }
         table.export-hide-headers tbody th { display: none !important; }
+        
+		/* --- ESTILOS DO PINCEL E PALETA (NOVO) --- */
+        .btn-active {
+            border-style: inset !important;
+            background-color: #d0d0d0;
+            padding: 5px 9px 3px 11px !important; /* Deixa o botão visualmente "afundado" e travado */
+        }
 
+        .cursor-pincel td { 
+            cursor: crosshair !important; /* Muda a setinha do mouse para uma mira quando o pincel ligar */
+        }
+
+        .custom-select-container { position: relative; margin-bottom: 10px; user-select: none; }
+        
+        .custom-select-display {
+            display: flex; align-items: center; gap: 8px;
+            background: white; border: 2px inset #dfdfdf;
+            padding: 3px 4px; cursor: pointer;
+        }
+        .custom-select-display .seta { margin-left: auto; font-size: 10px; }
+        
+        .color-box { width: 14px; height: 14px; border: 1px solid black; }
+        
+        .custom-select-list {
+            position: absolute; top: 100%; left: 0; width: 100%;
+            background: #c0c0c0; border: 2px outset #dfdfdf;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4);
+            max-height: 160px; overflow-y: auto; z-index: 3000;
+        }
+        
+        .custom-select-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 6px; cursor: pointer; 
+            border-bottom: 1px solid #a0a0a0;
+        }
+        .custom-select-item:hover { background: #000080; color: white; }
+		
         @media print {
             body, .grid-container { height: auto; background-color: white; overflow: visible; }
             .title-bar, .toolbar, .context-menu, .modal-overlay { display: none !important; }
@@ -248,8 +284,13 @@
             /* CORREÇÃO: Alterado de 100% para auto para manter o aproveitamento justo no papel */
             table { width: auto !important; table-layout: auto !important; } 
             
-            th, td { border: 1px solid black !important; outline: none !important; }
-            th { background-color: #e0e0e0 !important; -webkit-print-color-adjust: exact; }
+            th, td { 
+                border: 1px solid black !important; 
+                outline: none !important; 
+                -webkit-print-color-adjust: exact !important; /* Força Chrome e Edge a imprimirem a cor do fundo */
+                print-color-adjust: exact !important;         /* Força o Firefox a imprimir a cor do fundo */
+            }
+            th { background-color: #e0e0e0 !important; }
             td.selected, td.mass-selected { outline: none; background-color: white; }
             
             table.export-hide-grid td { border-color: transparent !important; }
@@ -273,6 +314,11 @@
         <button id="btnImprimir" class="btn" title="Imprime a planilha atual em papel ou PDF." onmousedown="event.preventDefault()" onclick="imprimir()">🖨️</button>
         <button id="btnScreenshot" class="btn" title="Captura uma imagem (Screenshot PNG) da planilha atual." onmousedown="event.preventDefault()" onclick="acaoScreenshot()">📸</button>
         <button id="btnConfig" class="btn" title="Ajusta filtros e aparências para a Impressão e o Screenshot." onmousedown="event.preventDefault()" onclick="abrirConfigModal()">⚙️ Config. de Impressão e Foto</button>
+        
+        <!-- NOVOS BOTÕES AQUI -->
+        <div class="separator"></div>
+        <button id="btnPaleta" class="btn" title="Configurar cores de fundo e texto para o pincel." onmousedown="event.preventDefault()" onclick="abrirPaletaModal()">🎨 Paleta</button>
+        <button id="btnPincel" class="btn" title="Liga/Desliga o Pincel. (Esquerdo pinta, Direito apaga)." onmousedown="event.preventDefault()" onclick="togglePincel()">🖌️ Pincel</button>
         
         <div class="separator"></div>
         <button id="btnRecortarTopo" class="btn" title="Recortar o conteúdo da célula selecionada (Ctrl+X)." onmousedown="event.preventDefault()" onclick="acaoRecortar()">✂️</button>
@@ -310,7 +356,7 @@
                 </div>
                 <div class="window-body" style="padding: 20px;">
                     <p style="margin-top: 0; font-size: 14px; font-weight: bold;">Planilha Bloqueada</p>
-                    <p style="margin-bottom: 0;">Vá ao menu superior e clique em <b>📄 Novo ▾</b> para escolher um formato de arquivo e iniciar seu trabalho.</p>
+                    <p style="margin-bottom: 0;">Vá ao menu superior e clique em <b>📄 Novo ▾</b> para criar uma planilha vazia, ou em <b>📂 Abrir</b> para carregar um arquivo existente.</p>
                 </div>
             </div>
         </div>
@@ -357,7 +403,50 @@
             </div>
         </div>
     </div>
+    
+	<!-- NOVO: JANELA DA PALETA DE CORES -->
+    <div id="paletaModal" class="modal-overlay" style="display: none;">
+        <div class="window-dialog" style="width: 280px;">
+            <div class="dialog-title">
+                <span>Paleta de Cores (Cosmético)</span>
+                <div class="close-x" title="Fechar aba" onclick="fecharPaletaModal()">X</div>
+            </div>
+            <div class="window-body">
+                <fieldset class="config-group">
+                    <legend>Configuração do Pincel</legend>
 
+                    <label style="display:block; margin-bottom: 4px;">Cor de Preenchimento (Fundo):</label>
+                    <div class="custom-select-container">
+                         <div class="custom-select-display" onclick="toggleDropdownCor('dropdownFundo')">
+                             <div class="color-box" id="boxFundoAtual" style="background-color: #FFFF00;"></div>
+                             <span id="txtFundoAtual">01 - Amarelo (Marca-texto)</span>
+                             <span class="seta">▾</span>
+                         </div>
+                         <div class="custom-select-list" id="dropdownFundo" style="display: none;">
+                             <!-- O JavaScript vai injetar a lista de cores aqui -->
+                         </div>
+                    </div>
+
+                    <label style="display:block; margin-top: 12px; margin-bottom: 4px;">Cor da Letra (Texto):</label>
+                    <div class="custom-select-container">
+                         <div class="custom-select-display" onclick="toggleDropdownCor('dropdownTexto')">
+                             <div class="color-box" id="boxTextoAtual" style="background-color: #000000;"></div>
+                             <span id="txtTextoAtual">00 - Preto (Padrão)</span>
+                             <span class="seta">▾</span>
+                         </div>
+                         <div class="custom-select-list" id="dropdownTexto" style="display: none;">
+                             <!-- O JavaScript vai injetar a lista de cores aqui -->
+                         </div>
+                    </div>
+
+                </fieldset>
+                <div class="window-footer">
+                    <button class="btn" style="width: 70px; font-weight: bold;" onclick="fecharPaletaModal()">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+	
     <div id="contextMenuCabecalho" class="context-menu" style="display: none;">
         <div id="menuCol" style="display: none;">
             <div class="menu-item" onclick="acaoEstrutural('col', 'inserirEsq')">Inserir Coluna à Esquerda</div>
@@ -400,6 +489,13 @@
         let gradeBloqueada = true; // NOVO: A planilha nasce bloqueada para edições 
         let ultimoFileHandle = null; // NOVO: Guarda a pasta do último salvamento 
         
+		// --- NOVO: VARIÁVEIS DO PINCEL ---
+        let pincelAtivo = false;
+        let isDraggingPincel = false;
+        let dragPincelApagando = false;
+        let corFundoPincel = '#FFFF00'; // Começa no amarelo marca-texto
+        let corTextoPincel = '#000000'; // Começa na letra preta
+		
         let totalColunas = 15;
         let totalLinhas = 30;
         let baseColunasTela = 15; // NOVO: Memória do tamanho da tela
@@ -712,6 +808,10 @@
             document.getElementById('btnConfig').disabled = travado;
             document.getElementById('btnAddCol').disabled = travado;
             document.getElementById('btnAddLinha').disabled = travado;
+            
+            // --- NOVO: TRAVA DOS BOTÕES DA PALETA E PINCEL ---
+            document.getElementById('btnPaleta').disabled = travado;
+            document.getElementById('btnPincel').disabled = travado;
 
             // TRAVA DUPLA: Imprimir e Screenshot travam se estiver bloqueada OU sem conteúdo
             document.getElementById('btnImprimir').disabled = travado || planilhaVazia;
@@ -827,15 +927,22 @@
         let valorPreEdicao = "";
 
         function getSnapshot() {
-            const data = [];
+            const data = []; const bgData = []; const colorData = [];
             const tbody = document.getElementById('corpoTabela');
             for (let r = 0; r < totalLinhas; r++) {
-                const rowData = []; const tr = tbody.children[r];
-                for (let c = 0; c < totalColunas; c++) { rowData.push(tr.children[c + 1].innerText); }
-                data.push(rowData);
+                const rowData = []; const rowBg = []; const rowColor = []; 
+                const tr = tbody.children[r];
+                for (let c = 0; c < totalColunas; c++) { 
+                    const td = tr.children[c + 1];
+                    rowData.push(td.innerText); 
+                    rowBg.push(td.style.backgroundColor);
+                    rowColor.push(td.style.color);
+                }
+                data.push(rowData); bgData.push(rowBg); colorData.push(rowColor);
             }
             return {
-                r: totalLinhas, c: totalColunas, d: data,
+                r: totalLinhas, c: totalColunas, 
+                d: data, bg: bgData, tc: colorData,
                 selR: celulaAtual ? currentRow : -1, selC: celulaAtual ? currentCol : -1
             };
         }
@@ -847,7 +954,13 @@
             const tbody = document.getElementById('corpoTabela');
             for (let r = 0; r < totalLinhas; r++) {
                 const tr = tbody.children[r];
-                for (let c = 0; c < totalColunas; c++) { tr.children[c + 1].innerText = snap.d[r][c]; }
+                for (let c = 0; c < totalColunas; c++) { 
+                    const td = tr.children[c + 1];
+                    td.innerText = snap.d[r][c]; 
+                    // Se houver registro de cor no histórico, ele aplica. Se não, deixa vazio.
+                    td.style.backgroundColor = (snap.bg && snap.bg[r]) ? snap.bg[r][c] : '';
+                    td.style.color = (snap.tc && snap.tc[r]) ? snap.tc[r][c] : '';
+                }
             }
             if (snap.selR >= 0 && snap.selR < totalLinhas && snap.selC >= 0 && snap.selC < totalColunas) {
                 selecionarUmaCelula(tbody.children[snap.selR].children[snap.selC + 1]);
@@ -1057,6 +1170,8 @@
         document.getElementById('planilha').addEventListener('contextmenu', function(e) {
             e.preventDefault();
             if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
+            
+            if (pincelAtivo) return; // NOVO: Se o pincel estiver ativo, bloqueia o menu para a borracha funcionar
 
             contextMenuCabecalho.style.display = 'none';
             contextMenuCelula.style.display = 'none';
@@ -1109,6 +1224,10 @@
                 contextMenuCabecalho.style.display = 'none'; contextMenuCelula.style.display = 'none';
                 document.getElementById('contextMenuNovo').style.display = 'none';
             }
+            // NOVO: Fecha os dropdowns de cor se o usuário clicar fora da caixinha
+            if (!e.target.closest('.custom-select-container')) {
+                fecharDropdownsCor();
+            }
         });
 
         // --- SISTEMA DE GESTÃO DO MOUSE ---
@@ -1117,6 +1236,17 @@
         tabela.addEventListener('mousedown', function(e) {
             if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
             if (e.target.tagName === 'TD') {
+                
+                // --- NOVO: LÓGICA DO PINCEL ---
+                if (pincelAtivo) {
+                    isDraggingPincel = true;
+                    // Se apertar o botão direito (código 2), ele ativa o modo borracha
+                    dragPincelApagando = (e.button === 2); 
+                    aplicarPintura(e.target, dragPincelApagando);
+                    return; // Aborta a seleção normal para não misturar as coisas
+                }
+
+                // --- LÓGICA NORMAL DE SELEÇÃO DA PLANILHA ---
                 if (e.button === 2) return;
                 if (isEditing && celulaAtual === e.target) return;
                 
@@ -1148,19 +1278,35 @@
         });
 
         tabela.addEventListener('mouseover', function(e) {
-            if (isDragging && e.target.tagName === 'TD') {
-                let pos = getRowCol(e.target);
-                if (!e.ctrlKey) {
-                    selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, false);
-                } else {
-                    selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, true);
+            if (e.target.tagName === 'TD') {
+                
+                // --- NOVO: LÓGICA DO PINCEL (ARRASTAR) ---
+                if (pincelAtivo && isDraggingPincel) {
+                    aplicarPintura(e.target, dragPincelApagando);
+                    return; // Aborta a seleção normal
                 }
-                atualizarMirasVisuais(e.target);
+
+                // --- LÓGICA NORMAL DE SELEÇÃO DA PLANILHA (ARRASTAR) ---
+                if (isDragging) {
+                    let pos = getRowCol(e.target);
+                    if (!e.ctrlKey) {
+                        selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, false);
+                    } else {
+                        selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, true);
+                    }
+                    atualizarMirasVisuais(e.target);
+                }
             }
         });
 
         document.addEventListener('mouseup', function() {
             isDragging = false;
+            
+            // NOVO: Ao soltar o clique, o pincel termina o traço e grava no histórico
+            if (isDraggingPincel) {
+                isDraggingPincel = false; 
+                salvarEstado(); 
+            }
         });
 
         tabela.addEventListener('dblclick', function(e) { 
@@ -1177,6 +1323,23 @@
             if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
             
             if (e.ctrlKey) {
+                // --- NOVO: ATALHO CTRL + A (Selecionar Tudo) ---
+                if (e.key.toLowerCase() === 'a') {
+                    if (!isEditing) {
+                        e.preventDefault(); // Impede o navegador de pintar a tela toda de azul
+                        
+                        // Se o usuário apertar Ctrl+A sem ter clicado em nada antes, foca na célula A1 (0,0) primeiro
+                        if (!celulaAtual) {
+                            const tbody = document.getElementById('corpoTabela');
+                            if (tbody.children.length > 0) selecionarUmaCelula(tbody.children[0].children[1]);
+                        }
+                        
+                        // Executa a seleção do retângulo englobando a matriz inteira
+                        selectRectangle(0, 0, totalLinhas - 1, totalColunas - 1, false);
+                    }
+                    return; // Retorna para não cair nas regras de navegação padrão da planilha
+                }
+
                 if (e.key.toLowerCase() === 'c') { if(checkSelectionRegularity()) acaoCopiar(); return; }
                 if (e.key.toLowerCase() === 'x') { if(checkSelectionRegularity()) acaoRecortar(); return; }
                 if (e.key.toLowerCase() === 'z') { if(!isEditing) { e.preventDefault(); acaoDesfazer(); } return; }
@@ -1629,8 +1792,100 @@
             atualizarMirasVisuais(celulaAtual); 
             verificarRestricoesInterface();
         }
+        
+		// --- NOVO: SISTEMA DE CORES E PINCEL ---
+        const listaCoresFundo = [
+            { hex: '#FFFF00', nome: '01 - Amarelo (Marca-texto)' },
+            { hex: '#92D050', nome: '02 - Verde Claro' },
+            { hex: '#00B0F0', nome: '03 - Azul Claro' },
+            { hex: '#FFC000', nome: '04 - Laranja' },
+            { hex: '#FF0000', nome: '05 - Vermelho' },
+            { hex: '#D9D9D9', nome: '06 - Cinza Claro' },
+            { hex: '#000000', nome: '07 - Preto Escuro' }
+        ];
 
+        const listaCoresTexto = [
+            { hex: '#000000', nome: '00 - Preto (Padrão)' },
+            { hex: '#FFFFFF', nome: '01 - Branco' },
+            { hex: '#FF0000', nome: '02 - Vermelho' },
+            { hex: '#0070C0', nome: '03 - Azul' },
+            { hex: '#00B050', nome: '04 - Verde Escuro' },
+            { hex: '#FFFF00', nome: '05 - Amarelo' }
+        ];
+
+        function inicializarPaletas() {
+            const dropFundo = document.getElementById('dropdownFundo');
+            listaCoresFundo.forEach(cor => {
+                let div = document.createElement('div');
+                div.className = 'custom-select-item';
+                div.innerHTML = `<div class="color-box" style="background-color: ${cor.hex};"></div> <span>${cor.nome}</span>`;
+                div.onclick = () => selecionarCor('Fundo', cor.hex, cor.nome);
+                dropFundo.appendChild(div);
+            });
+
+            const dropTexto = document.getElementById('dropdownTexto');
+            listaCoresTexto.forEach(cor => {
+                let div = document.createElement('div');
+                div.className = 'custom-select-item';
+                div.innerHTML = `<div class="color-box" style="background-color: ${cor.hex};"></div> <span>${cor.nome}</span>`;
+                div.onclick = () => selecionarCor('Texto', cor.hex, cor.nome);
+                dropTexto.appendChild(div);
+            });
+        }
+
+        function abrirPaletaModal() { document.getElementById('paletaModal').style.display = 'flex'; }
+        function fecharPaletaModal() { document.getElementById('paletaModal').style.display = 'none'; fecharDropdownsCor(); }
+
+        function toggleDropdownCor(id) {
+            fecharDropdownsCor();
+            const el = document.getElementById(id);
+            if(el.style.display === 'none') el.style.display = 'block';
+        }
+
+        function fecharDropdownsCor() {
+            document.getElementById('dropdownFundo').style.display = 'none';
+            document.getElementById('dropdownTexto').style.display = 'none';
+        }
+
+        function selecionarCor(tipo, hex, nome) {
+            document.getElementById(`box${tipo}Atual`).style.backgroundColor = hex;
+            document.getElementById(`txt${tipo}Atual`).innerText = nome;
+            if(tipo === 'Fundo') corFundoPincel = hex;
+            if(tipo === 'Texto') corTextoPincel = hex;
+            fecharDropdownsCor();
+        }
+
+        function togglePincel() {
+            if (gradeBloqueada) return;
+            pincelAtivo = !pincelAtivo;
+            const btn = document.getElementById('btnPincel');
+            const container = document.getElementById('gridContainer');
+            
+            if (pincelAtivo) {
+                btn.classList.add('btn-active');
+                container.classList.add('cursor-pincel');
+                sairModoEdicao();
+                clearSelection();
+                atualizarMirasVisuais(null);
+            } else {
+                btn.classList.remove('btn-active');
+                container.classList.remove('cursor-pincel');
+            }
+        }
+
+        function aplicarPintura(td, apagar) {
+            if (apagar) {
+                td.style.backgroundColor = '';
+                td.style.color = '';
+            } else {
+                td.style.backgroundColor = corFundoPincel;
+                td.style.color = corTextoPincel;
+            }
+        }
+		
         window.onload = function() { 
+            inicializarPaletas(); // NOVO: Monta as listas de cores assim que a página abre
+
             // 1. Captura a área cinza onde a grade será desenhada
             const container = document.getElementById('gridContainer');
             
