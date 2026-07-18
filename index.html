@@ -233,6 +233,25 @@
 
         td.selected { background-color: #cce8ff; }
         td.active-focus { outline: 2px solid #000080; outline-offset: -2px; z-index: 1; position: relative; }
+        
+        /* --- NOVO: Bordas de Perímetro Dinâmicas combinando com a sua cor #000080 --- */
+        td.sel-top { box-shadow: inset 0 2px 0 0 #000080, inset 0 0 0 0 transparent !important; }
+        td.sel-bottom { box-shadow: inset 0 -2px 0 0 #000080, inset 0 0 0 0 transparent !important; }
+        td.sel-left { box-shadow: inset 2px 0 0 0 #000080, inset 0 0 0 0 transparent !important; }
+        td.sel-right { box-shadow: inset -2px 0 0 0 #000080, inset 0 0 0 0 transparent !important; }
+        
+        /* Combinações de Cantos para fechar o quadrado perfeitamente */
+        td.sel-top.sel-left { box-shadow: inset 2px 2px 0 0 #000080 !important; }
+        td.sel-top.sel-right { box-shadow: inset -2px 2px 0 0 #000080 !important; }
+        td.sel-bottom.sel-left { box-shadow: inset 2px -2px 0 0 #000080 !important; }
+        td.sel-bottom.sel-right { box-shadow: inset -2px -2px 0 0 #000080 !important; }
+        
+        /* Proteção para impressão */
+        @media print {
+            td.sel-top, td.sel-bottom, td.sel-left, td.sel-right { box-shadow: none !important; }
+        }
+
+        /* --- Mantendo o restante do seu código intacto --- */
         td.editing { outline: 2px solid black; outline-offset: -2px; background-color: white; cursor: text; user-select: text; z-index: 2; position: relative; }
         td.mass-selected { background-color: #cce8ff; } 
         th.header-highlight { background-color: #a0a0a0; border: 1px inset #ffffff; font-weight: bold; }
@@ -548,7 +567,7 @@
 
         function clearSelection() {
             selectedCells.forEach(td => {
-                td.classList.remove('selected');
+                td.classList.remove('selected', 'sel-top', 'sel-bottom', 'sel-left', 'sel-right'); // NOVO: Limpa as bordas também
             });
             selectedCells = [];
             document.querySelectorAll('.mass-selected').forEach(el => el.classList.remove('mass-selected'));
@@ -613,11 +632,21 @@
                 let tr = tbody.children[r];
                 for (let c = minC; c <= maxC; c++) {
                     let td = tr.children[c + 1];
+                    
                     if (!td.classList.contains('selected')) {
                         td.classList.add('selected');
                     }
                     if (!selectedCells.includes(td)) {
                         selectedCells.push(td);
+                    }
+                    
+                    // --- NOVO: LÓGICA DE BORDAS INTELIGENTES DO PERÍMETRO ---
+                    // Se estivermos desenhando um retângulo maior que uma única célula
+                    if (minR !== maxR || minC !== maxC) {
+                        if (r === minR) td.classList.add('sel-top');
+                        if (r === maxR) td.classList.add('sel-bottom');
+                        if (c === minC) td.classList.add('sel-left');
+                        if (c === maxC) td.classList.add('sel-right');
                     }
                 }
             }
@@ -655,7 +684,11 @@
 
         function apagarConteudoSelecao() {
             contextMenuCelula.style.display = 'none';
-            selectedCells.forEach(td => { td.innerText = ''; });
+            selectedCells.forEach(td => { 
+                td.innerText = ''; 
+                td.style.backgroundColor = ''; // NOVO: Apaga a cor de fundo
+                td.style.color = '';           // NOVO: Apaga a cor da letra
+            });
             salvarEstado();
         }
 
@@ -1062,7 +1095,12 @@
 
             if (tipo === 'col') {
                 if (acao === 'limpar') {
-                    for (let i = 0; i < tbody.children.length; i++) tbody.children[i].children[targetMenuIndex].innerText = '';
+                    for (let i = 0; i < tbody.children.length; i++) {
+                        let celula = tbody.children[i].children[targetMenuIndex];
+                        celula.innerText = '';
+                        celula.style.backgroundColor = ''; // Limpa o fundo
+                        celula.style.color = '';           // Limpa a letra
+                    }
                 } 
                 else if (acao === 'apagar') {
                     if (totalColunas <= 1) return alert("Não é possível apagar a última coluna.");
@@ -1080,7 +1118,11 @@
             else if (tipo === 'row') {
                 if (acao === 'limpar') {
                     const tds = tbody.children[targetMenuIndex].querySelectorAll('td');
-                    tds.forEach(td => td.innerText = '');
+                    tds.forEach(td => {
+                        td.innerText = '';
+                        td.style.backgroundColor = ''; // Limpa o fundo
+                        td.style.color = '';           // Limpa a letra
+                    });
                 } 
                 else if (acao === 'apagar') {
                     if (totalLinhas <= 1) return alert("Não é possível apagar a última linha.");
@@ -1098,7 +1140,7 @@
             salvarEstado(); 
         }
 
-        // --- COLAGEM EM MATRIZ ---
+        // --- COLAGEM EM MATRIZ E ÁREA DE TRANSFERÊNCIA ---
         function processarColagem(texto) {
             if (!celulaAtual) return;
             if (isEditing) {
@@ -1109,31 +1151,145 @@
                 let inicioRow = currentRow; let inicioCol = currentCol;
                 const tbody = document.getElementById('corpoTabela');
 
+                let maxCols = 0; // NOVO: Rastreador de largura do bloco colado
+
                 for (let i = 0; i < linhas.length; i++) {
                     let colunas = linhas[i].split('\t'); 
+                    
+                    // Atualiza a largura máxima detectada
+                    if (colunas.length > maxCols) maxCols = colunas.length;
+
                     while (inicioRow + i >= totalLinhas) adicionarUltimaLinha(false);
                     for (let j = 0; j < colunas.length; j++) {
                         while (inicioCol + j >= totalColunas) adicionarUltimaColuna(false);
                         const tr = tbody.children[inicioRow + i];
-                        const td = tr.children[inicioCol + j + 1]; td.innerText = colunas[j];
+                        const td = tr.children[inicioCol + j + 1]; 
+                        td.innerText = colunas[j];
+                        // Limpa a cor para receber texto puro limpo
+                        td.style.backgroundColor = '';
+                        td.style.color = '';
                     }
                 }
+                
+                // NOVO: Desenha a área azul sobre o bloco que acabou de nascer
+                if (linhas.length > 0 && maxCols > 0) {
+                    selectRectangle(inicioRow, inicioCol, inicioRow + linhas.length - 1, inicioCol + maxCols - 1, false);
+                }
+
                 salvarEstado(); 
             }
         }
 
+        // NOVO: Lê as cores se for copiado um trecho HTML (Da própria planilha, Excel ou Web)
+        function processarColagemHTML(htmlData, textData) {
+            if (!celulaAtual) return;
+            if (isEditing) {
+                document.execCommand('insertText', false, textData);
+                return;
+            }
+            
+            let tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlData;
+            let table = tempDiv.querySelector('table');
+
+            // Se não for uma tabela, repassa para a colagem de texto normal
+            if (!table) {
+                processarColagem(textData);
+                return;
+            }
+
+            let linhas = table.querySelectorAll('tr');
+            if (linhas.length === 0) {
+                processarColagem(textData);
+                return;
+            }
+
+            let inicioRow = currentRow; let inicioCol = currentCol;
+            const tbody = document.getElementById('corpoTabela');
+
+            let maxCols = 0; // NOVO: Rastreador de largura
+            let maxRows = 0; // NOVO: Rastreador de altura
+
+            for (let i = 0; i < linhas.length; i++) {
+                let colunas = linhas[i].querySelectorAll('td, th'); 
+                if (colunas.length === 0) continue;
+
+                maxRows = i; // Grava a última linha válida processada
+                if (colunas.length > maxCols) maxCols = colunas.length; // Grava a coluna mais distante
+
+                while (inicioRow + i >= totalLinhas) adicionarUltimaLinha(false);
+                for (let j = 0; j < colunas.length; j++) {
+                    while (inicioCol + j >= totalColunas) adicionarUltimaColuna(false);
+                    
+                    const tr = tbody.children[inicioRow + i];
+                    const td = tr.children[inicioCol + j + 1]; 
+                    
+                    td.innerText = colunas[j].innerText || '';
+                    td.style.backgroundColor = colunas[j].style.backgroundColor || '';
+                    td.style.color = colunas[j].style.color || '';
+                }
+            }
+            
+            // NOVO: Desenha a área azul sobre o bloco HTML colado
+            if (maxCols > 0) {
+                selectRectangle(inicioRow, inicioCol, inicioRow + maxRows, inicioCol + maxCols - 1, false);
+            }
+
+            salvarEstado();
+        }
+
+        // NOVO: Escuta o evento Ctrl+V separando texto de HTML
         document.addEventListener('paste', function(e) {
             e.preventDefault();
-            let pasteData = (e.clipboardData || window.clipboardData).getData('text/plain');
-            processarColagem(pasteData);
+            let clipboardData = e.clipboardData || window.clipboardData;
+            let htmlData = clipboardData.getData('text/html');
+            let textData = clipboardData.getData('text/plain');
+            
+            if (htmlData && htmlData.includes('<table')) {
+                processarColagemHTML(htmlData, textData);
+            } else {
+                processarColagem(textData);
+            }
         });
 
         async function acaoColarInterface() {
             contextMenuCelula.style.display = 'none';
             if (!celulaAtual) return;
-            try { const texto = await navigator.clipboard.readText(); processarColagem(texto); } catch (err) { alert("Use Ctrl+V."); }
+            
+            try { 
+                const clipboardItems = await navigator.clipboard.read();
+                let htmlData = '';
+                let textData = '';
+                for (const item of clipboardItems) {
+                    if (item.types.includes('text/html')) {
+                        const blob = await item.getType('text/html');
+                        htmlData = await blob.text();
+                    }
+                    if (item.types.includes('text/plain')) {
+                        const blob = await item.getType('text/plain');
+                        textData = await blob.text();
+                    }
+                }
+                
+                if (htmlData && htmlData.includes('<table')) {
+                    processarColagemHTML(htmlData, textData);
+                } else if (textData) {
+                    processarColagem(textData);
+                } else {
+                    const texto = await navigator.clipboard.readText();
+                    processarColagem(texto);
+                }
+            } catch (err) { 
+                try {
+                    const texto = await navigator.clipboard.readText(); 
+                    processarColagem(texto);
+                } catch(e2) {
+                    alert("Use Ctrl+V no teclado para colar."); 
+                }
+            }
         }
 
+        // NOVO: O "Copiar" agora empacota HTML rico com cores
         async function acaoCopiar() {
             contextMenuCelula.style.display = 'none';
             if (selectedCells.length === 0) return;
@@ -1155,20 +1311,38 @@
 
             const tbody = document.getElementById('corpoTabela');
             let linhasTexto = [];
+            let htmlTabela = '<table>';
+
             for (let r = minR; r <= maxR; r++) {
                 let tr = tbody.children[r];
                 let linhaCells = [];
+                htmlTabela += '<tr>';
                 for (let c = minC; c <= maxC; c++) {
-                    linhaCells.push(tr.children[c + 1].innerText);
+                    let td = tr.children[c + 1];
+                    linhaCells.push(td.innerText);
+                    let bg = td.style.backgroundColor || '';
+                    let fg = td.style.color || '';
+                    htmlTabela += `<td style="background-color:${bg}; color:${fg};">${td.innerHTML}</td>`;
                 }
                 linhasTexto.push(linhaCells.join('\t')); 
+                htmlTabela += '</tr>';
             }
+            htmlTabela += '</table>';
             let textoClipboard = linhasTexto.join('\n'); 
 
             try {
-                await navigator.clipboard.writeText(textoClipboard);
+                // Copia duas vias ao mesmo tempo: HTML e Texto Puro
+                const clipboardItem = new ClipboardItem({
+                    'text/plain': new Blob([textoClipboard], { type: 'text/plain' }),
+                    'text/html': new Blob([htmlTabela], { type: 'text/html' })
+                });
+                await navigator.clipboard.write([clipboardItem]);
             } catch (err) {
-                alert("Erro ao acessar a área de transferência.");
+                try {
+                    await navigator.clipboard.writeText(textoClipboard);
+                } catch (err2) {
+                    alert("Erro ao acessar a área de transferência.");
+                }
             }
         }
 
@@ -1180,7 +1354,11 @@
             }
 
             await acaoCopiar();
-            selectedCells.forEach(td => { td.innerText = ""; });
+            selectedCells.forEach(td => { 
+                td.innerText = ""; 
+                td.style.backgroundColor = ''; // NOVO: Remove a cor ao Recortar
+                td.style.color = '';           // NOVO: Remove a cor ao Recortar
+            });
             salvarEstado();
         }
 
@@ -1803,7 +1981,9 @@
             
             toggleExportLayout(true);
             try {
-                const canvas = await html2canvas(document.getElementById('planilha'));
+                // NOVO: Adicionado { scale: 3 } para triplicar a resolução da imagem
+                const canvas = await html2canvas(document.getElementById('planilha'), { scale: 3 });
+                
                 toggleExportLayout(false);
                 const defaultName = document.getElementById('appTitle').innerText.replace('SimpleSheet - ', '') + '.png';
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
