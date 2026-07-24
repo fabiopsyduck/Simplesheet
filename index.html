@@ -353,7 +353,9 @@
         <button id="btnNovo" class="btn" title="Cria um novo documento escolhendo o formato." onclick="abrirMenuNovo(event)">📄 Novo ▾</button>
         <div class="separator"></div>
         
-        <label class="btn" title="Abre arquivos suportados (Auto-detecta separadores de coluna)." onmousedown="event.preventDefault()">📂 Abrir <input type="file" id="fileInput" accept=".csv, .tsv" onchange="importarCSV(event)"></label>
+        <button id="btnAbrir" class="btn" title="Abre arquivos suportados (Auto-detecta separadores de coluna)." onmousedown="event.preventDefault()" onclick="acaoAbrir()">📂 Abrir</button>
+        <!-- Mantido escondido como Plano B para navegadores que não suportam a memória de pastas -->
+        <input type="file" id="fileInput" accept=".csv, .tsv" style="display: none;" onchange="importarCSV(event)">
         <button id="btnSalvar" class="btn" title="Salva a planilha atual no seu computador em formato CSV." onmousedown="event.preventDefault()" onclick="exportarCSV()">💾 Salvar</button>
         <button id="btnImprimir" class="btn" title="Imprime a planilha atual em papel ou PDF." onmousedown="event.preventDefault()" onclick="imprimir()">🖨️</button>
         <button id="btnScreenshot" class="btn" title="Captura uma imagem (Screenshot PNG) da planilha atual." onmousedown="event.preventDefault()" onclick="acaoScreenshot()">📸</button>
@@ -1791,11 +1793,36 @@
             rows.push(currentRow);
             return rows;
         }
-
+        
+		// --- NOVO: FUNÇÃO DE ABERTURA MODERNA (COM MEMÓRIA DE PASTA) ---
+        async function acaoAbrir() {
+            try {
+                if (window.showOpenFilePicker) {
+                    const [handle] = await window.showOpenFilePicker({
+                        types: [{ description: 'Planilhas', accept: { 'text/csv': ['.csv'], 'text/tab-separated-values': ['.tsv'] } }]
+                    });
+                    ultimoFileHandle = handle; // <--- A MÁGICA: Memoriza a localização original do arquivo!
+                    const arquivo = await handle.getFile();
+                    processarLeituraArquivo(arquivo);
+                } else {
+                    document.getElementById('fileInput').click(); // Plano B: Navegadores antigos
+                }
+            } catch (erro) {
+                // Se o erro não for porque o usuário clicou em "Cancelar", aciona o Plano B
+                if (erro.name !== 'AbortError') document.getElementById('fileInput').click();
+            }
+        }
+		
+        // --- MANTÉM A COMPATIBILIDADE COM O PLANO B ---
         function importarCSV(evento) {
             const arquivo = evento.target.files[0]; 
             if (!arquivo) return;
-            
+            processarLeituraArquivo(arquivo);
+            evento.target.value = ''; 
+        }
+
+        // --- SUA LÓGICA INTACTA DE LEITURA E TORNEIO DE INTEGRIDADE ---
+        function processarLeituraArquivo(arquivo) {
             const leitor = new FileReader();
             leitor.onload = function(e) {
                 const textoOriginal = e.target.result;
@@ -1851,12 +1878,10 @@
                 });
                 
                 // --- RESILIÊNCIA DE GRADE BASE (PISO DO TAMANHO DA TELA) ---
-                // Compara o arquivo com o tamanho inicial da tela (baseColunasTela e baseLinhasTela).
-                // Se o arquivo for menor, mantém o tamanho da tela. Se for maior, a planilha cresce.
                 totalColunas = Math.max(baseColunasTela, maxColunasCSV + 2); 
                 totalLinhas = Math.max(baseLinhasTela, linhas.length + 5); 
                 
-                gradeBloqueada = false; // <--- ADICIONE ESTA LINHA AQUI PARA DESBLOQUEAR AO ABRIR
+                gradeBloqueada = false; // DESBLOQUEIA AO ABRIR
                 document.getElementById('welcomeOverlay').style.display = 'none'; // FAZ A JANELA SUMIR
                 
                 inicializarPlanilhaNativa();
@@ -1877,7 +1902,6 @@
                 historico = []; historicoPos = -1; salvarEstado();
             };
             leitor.readAsText(arquivo); 
-            evento.target.value = ''; 
         }
 
         // --- INTERFACE DE SALVAMENTO HÍBRIDO ATUALIZADA (CSV, TSV & PIPE) ---
