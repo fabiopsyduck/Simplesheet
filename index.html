@@ -341,6 +341,26 @@
             table.export-hide-headers thead { display: none !important; }
             table.export-hide-headers tbody th { display: none !important; }
         }
+		
+		.grupo-exportacao {
+            display: inline-flex;
+            align-items: center;
+            border: 1px dashed #999; /* Borda tracejada indicando um grupo especial */
+            border-radius: 6px;
+            padding: 2px 10px;
+            background-color: rgba(0, 0, 0, 0.04); /* Fundo levemente escurecido para destacar */
+            gap: 5px; /* Espaço entre os botões dentro da caixa */
+            margin-left: 10px; /* Descola um pouco do resto da barra */
+        }
+
+        .rotulo-grupo {
+            font-size: 11px;
+            color: #555;
+            text-transform: uppercase;
+            margin-right: 5px;
+            font-weight: bold;
+            pointer-events: none; /* Evita que o texto atrapalhe o clique */
+        }
     </style>
 </head>
 <body>
@@ -357,21 +377,27 @@
         <!-- Mantido escondido como Plano B para navegadores que não suportam a memória de pastas -->
         <input type="file" id="fileInput" accept=".csv, .tsv" style="display: none;" onchange="importarCSV(event)">
         <button id="btnSalvar" class="btn" title="Salva a planilha atual no seu computador em formato CSV." onmousedown="event.preventDefault()" onclick="exportarCSV()">💾 Salvar</button>
-        <button id="btnImprimir" class="btn" title="Imprime a planilha atual em papel ou PDF." onmousedown="event.preventDefault()" onclick="imprimir()">🖨️</button>
-        <button id="btnScreenshot" class="btn" title="Captura uma imagem (Screenshot PNG) da planilha atual." onmousedown="event.preventDefault()" onclick="acaoScreenshot()">📸</button>
-        <button id="btnConfig" class="btn" title="Ajusta filtros e aparências para a Impressão e o Screenshot." onmousedown="event.preventDefault()" onclick="abrirConfigModal()">⚙️ Config. de Impressão e Foto</button>
-        
-        <!-- NOVOS BOTÕES AQUI -->
-        <div class="separator"></div>
-        <button id="btnPaleta" class="btn" title="Configurar cores de fundo e texto para o pincel." onmousedown="event.preventDefault()" onclick="abrirPaletaModal()">🎨 Paleta</button>
-        <button id="btnPincel" class="btn" title="Liga/Desliga o Pincel. (Esquerdo pinta, Direito apaga)." onmousedown="event.preventDefault()" onclick="togglePincel()">🖌️ Pincel</button>
         
         <div class="separator"></div>
+
+        <!-- NOVA CAIXA DE FERRAMENTAS VISUAIS (OPÇÃO 2) -->
+        <div class="grupo-exportacao">
+            <span class="rotulo-grupo">Visual / Exportar:</span>
+            <button id="btnImprimir" class="btn" title="Imprime a planilha atual em papel ou PDF." onmousedown="event.preventDefault()" onclick="imprimir()">🖨️</button>
+            <button id="btnScreenshot" class="btn" title="Captura uma imagem (Screenshot PNG) da planilha atual." onmousedown="event.preventDefault()" onclick="acaoScreenshot()">📸</button>
+            <button id="btnConfig" class="btn" title="Ajusta filtros e aparências para a Impressão e o Screenshot." onmousedown="event.preventDefault()" onclick="abrirConfigModal()">⚙️ Config. de Impressão</button>
+            <button id="btnPaleta" class="btn" title="Configurar cores para o pincel (Afeta apenas Foto/Impressão, não salva no arquivo)." onmousedown="event.preventDefault()" onclick="abrirPaletaModal()">🎨 Paleta</button>
+            <button id="btnPincel" class="btn" title="Liga/Desliga o Pincel. (Esquerdo pinta, Direito apaga - Afeta apenas Foto/Impressão)." onmousedown="event.preventDefault()" onclick="togglePincel()">🖌️ Pincel</button>
+        </div>
+        
+        <div class="separator"></div>
+        
         <button id="btnRecortarTopo" class="btn" title="Recortar o conteúdo da célula selecionada (Ctrl+X)." onmousedown="event.preventDefault()" onclick="acaoRecortar()">✂️</button>
         <button id="btnCopiarTopo" class="btn" title="Copiar o conteúdo da célula selecionada (Ctrl+C)." onmousedown="event.preventDefault()" onclick="acaoCopiar()">📄</button>
         <button id="btnColarTopo" class="btn" title="Colar conteúdo na célula selecionada (Ctrl+V)." onmousedown="event.preventDefault()" onclick="acaoColarInterface()">📋</button>
         
         <div class="separator"></div>
+        
         <button id="btnDesfazer" class="btn" title="Desfazer a última ação (Ctrl+Z)." onmousedown="event.preventDefault()" onclick="acaoDesfazer()" disabled>↩️</button>
         <button id="btnRefazer" class="btn" title="Refazer a última ação desfeita (Ctrl+Y)." onmousedown="event.preventDefault()" onclick="acaoRefazer()" disabled>↪️</button>
 
