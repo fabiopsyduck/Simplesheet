@@ -184,7 +184,7 @@
             font-size: 12px;
         }
 
-        .menu-item { padding: 5px 15px; cursor: pointer; color: black; }
+        .menu-item { padding: 5px 15px; cursor: pointer; color: black; white-space: nowrap; }
         .menu-item:hover { background-color: #000080; color: white; }
         .menu-separator { height: 1px; background-color: #808080; border-bottom: 1px solid #ffffff; margin: 3px 2px; }
         
@@ -195,7 +195,23 @@
             pointer-events: none;
         }
         .menu-item.disabled:hover { background-color: transparent; }
-
+        
+		/* --- SUBMENU FLUTUANTE DE FÓRMULAS --- */
+        .menu-item.has-submenu { position: relative; }
+        .submenu-flutuante {
+            display: none; 
+            position: absolute; 
+            left: 100%; 
+            top: -2px;
+            background-color: #c0c0c0; 
+            border: 2px outset #dfdfdf; 
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            padding: 2px; 
+            min-width: 120px; 
+            z-index: 10000;
+        }
+        .menu-item.has-submenu:hover .submenu-flutuante { display: block; }
+		
         /* --- PLANILHA E CÉLULAS --- */
         .grid-container { flex: 1; background-color: #808080; overflow: auto; position: relative; }
         
@@ -344,8 +360,8 @@
             table.export-hide-headers thead { display: none !important; }
             table.export-hide-headers tbody th { display: none !important; }
         }
-		
-		.grupo-exportacao {
+        
+        .grupo-exportacao {
             display: inline-flex;
             align-items: center;
             border: 1px dashed #999; /* Borda tracejada indicando um grupo especial */
@@ -364,8 +380,8 @@
             font-weight: bold;
             pointer-events: none; /* Evita que o texto atrapalhe o clique */
         }
-		
-		/* --- NOVO: REDIMENSIONAMENTO DE COLUNAS --- */
+        
+        /* --- NOVO: REDIMENSIONAMENTO DE COLUNAS --- */
         thead th {
             position: sticky;
             top: 0;
@@ -582,7 +598,28 @@
             </div>
         </div>
     </div>
-
+    
+	<!-- NOVO: CONSTRUTOR DE CÁLCULO ASSISTIDO (WIN98) -->
+    <div id="modalConstrutor" class="modal-overlay" style="display: none;">
+        <div class="window-dialog" style="width: 350px;">
+            <div class="dialog-title">
+                <span>Construtor de Cálculo</span>
+                <div class="close-x" title="Fechar aba" onclick="fecharConstrutor()">X</div>
+            </div>
+            <div class="window-body" style="text-align: center;">
+                <p style="margin-top: 0; font-size: 11px; margin-bottom: 15px;">Escolha a operação matemática entre cada célula:</p>
+                
+                <!-- O Javascript vai injetar as coordenadas aqui dentro -->
+                <div id="conteudoConstrutor" style="margin: 15px 0; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;"></div>
+                
+                <div class="window-footer" style="margin-top: 20px; justify-content: center;">
+                    <button class="btn" style="font-weight: bold; width: 120px; justify-content: center;" onclick="aplicarFormulaConstrutor()">Aplicar Fórmula</button>
+                    <button class="btn" style="width: 90px; justify-content: center;" onclick="fecharConstrutor()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+	
     <div id="contextMenuCabecalho" class="context-menu" style="display: none;">
         <div id="menuCol" style="display: none;">
             <div class="menu-item" onclick="acaoEstrutural('col', 'inserirEsq')">Inserir Coluna à Esquerda</div>
@@ -606,6 +643,26 @@
         <div id="ctxColar" class="menu-item" onmousedown="event.preventDefault()" onclick="acaoColarInterface()">📋 Colar</div>
         <div class="menu-separator"></div>
         <div class="menu-item" onmousedown="event.preventDefault()" onclick="apagarConteudoSelecao()">🧻 Apagar conteúdo</div>
+        
+        <div class="menu-separator"></div>
+        <div class="menu-item" onmousedown="event.preventDefault()" onclick="copiarPosicoes()">📍 Copiar Coordenadas para Cálculo</div>
+        
+        <div class="menu-item has-submenu">
+            🧮 Transformar em Cálculo ►
+            <div class="submenu-flutuante">
+                <!-- Opções Rápidas -->
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('+')">Somar (+)</div>
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('-')">Subtrair (-)</div>
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('*')">Multiplicar (*)</div>
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('/')">Dividir (/)</div>
+                
+                <!-- Divisória visual dentro do submenu -->
+                <div class="menu-separator"></div>
+                
+                <!-- A opção de cálculo avançado agora mora aqui dentro! -->
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="abrirConstrutorFormula()">🛠️ Montar Cálculo Avançado</div>
+            </div>
+        </div>
     </div>
 
     <div id="contextMenuNovo" class="context-menu" style="display: none;">
@@ -703,7 +760,7 @@
             let pos = getRowCol(td);
             currentRow = pos.r;
             currentCol = pos.c;
-            valorPreEdicao = celulaAtual.innerText;
+            valorPreEdicao = celulaAtual.dataset.raw !== undefined ? celulaAtual.dataset.raw : celulaAtual.innerText;
             
             td.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
             atualizarMirasVisuais(td);
@@ -777,9 +834,10 @@
         function apagarConteudoSelecao() {
             contextMenuCelula.style.display = 'none';
             selectedCells.forEach(td => { 
+                td.dataset.raw = ''; // <--- NOVO
                 td.innerText = ''; 
-                td.style.backgroundColor = ''; // NOVO: Apaga a cor de fundo
-                td.style.color = '';           // NOVO: Apaga a cor da letra
+                td.style.backgroundColor = ''; 
+                td.style.color = '';           
             });
             salvarEstado();
         }
@@ -798,7 +856,7 @@
             let pos = getRowCol(celulaAtual);
             currentRow = pos.r;
             currentCol = pos.c;
-            valorPreEdicao = celulaAtual.innerText;
+            valorPreEdicao = celulaAtual.dataset.raw !== undefined ? celulaAtual.dataset.raw : celulaAtual.innerText;
             
             celulaAtual.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
             atualizarMirasVisuais(celulaAtual);
@@ -1084,7 +1142,11 @@
                 const tr = tbody.children[r];
                 for (let c = 0; c < totalColunas; c++) { 
                     const td = tr.children[c + 1];
-                    rowData.push(td.innerText); 
+                    
+                    // NOVO: Puxa a fórmula (se existir) ou o texto normal para salvar no histórico
+                    let textoPuro = td.dataset.raw !== undefined ? td.dataset.raw : td.innerText;
+                    rowData.push(textoPuro); 
+                    
                     rowBg.push(td.style.backgroundColor);
                     rowColor.push(td.style.color);
                 }
@@ -1106,12 +1168,20 @@
                 const tr = tbody.children[r];
                 for (let c = 0; c < totalColunas; c++) { 
                     const td = tr.children[c + 1];
+                    
+                    // NOVO: Devolve a fórmula ou texto para o "fundo" e para a "frente" da célula
+                    td.dataset.raw = snap.d[r][c];
                     td.innerText = snap.d[r][c]; 
+                    
                     // Se houver registro de cor no histórico, ele aplica. Se não, deixa vazio.
                     td.style.backgroundColor = (snap.bg && snap.bg[r]) ? snap.bg[r][c] : '';
                     td.style.color = (snap.tc && snap.tc[r]) ? snap.tc[r][c] : '';
                 }
             }
+            
+            // NOVO: Faz o motor matemático rodar e calcular a planilha do passado que acabou de ser restaurada!
+            atualizarTodasAsFormulas();
+
             if (snap.selR >= 0 && snap.selR < totalLinhas && snap.selC >= 0 && snap.selC < totalColunas) {
                 selecionarUmaCelula(tbody.children[snap.selR].children[snap.selC + 1]);
             } else {
@@ -1562,7 +1632,7 @@
                         e.target.classList.add('selected');
                         selectedCells.push(e.target);
                         currentRow = pos.r; currentCol = pos.c;
-                        valorPreEdicao = celulaAtual.innerText;
+                        valorPreEdicao = celulaAtual.dataset.raw !== undefined ? celulaAtual.dataset.raw : celulaAtual.innerText;
                     }
                     verificarRestricoesInterface();
                 } else {
@@ -1735,6 +1805,10 @@
 
         function entrarModoEdicao(td) {
             isEditing = true;
+            
+            // NOVO: Ao entrar na edição, mostra a fórmula original (o fundo) em vez do resultado
+            if (td.dataset.raw !== undefined) td.innerText = td.dataset.raw;
+            
             td.classList.remove('active-focus'); 
             td.classList.add('editing');
             td.contentEditable = "true";
@@ -1753,7 +1827,17 @@
                 celulaAtual.classList.remove('editing');
                 celulaAtual.classList.add('active-focus');
                 celulaAtual.blur();
-                if (!foiCancelado && celulaAtual.innerText !== valorPreEdicao) salvarEstado();
+                
+                let mudou = celulaAtual.innerText !== valorPreEdicao;
+                
+                if (!foiCancelado && mudou) {
+                    celulaAtual.dataset.raw = celulaAtual.innerText; // Guarda a fórmula digitada no fundo
+                    atualizarTodasAsFormulas(); // Calcula ela e todas as outras dependentes na tela
+                    salvarEstado();
+                } else {
+                    // Se cancelou (ESC) ou apertou Enter sem alterar nada, restaura a exibição visual do resultado
+                    atualizarTodasAsFormulas();
+                }
             }
         }
 
@@ -1988,10 +2072,13 @@
                     const tdElements = tableRows[i]?.querySelectorAll("td");
                     linha.forEach((dado, j) => { 
                         if (tdElements?.[j]) {
+                            tdElements[j].dataset.raw = dado; // <--- NOVO AQUI
                             tdElements[j].innerText = dado; 
                         }
                     });
                 });
+                
+                atualizarTodasAsFormulas(); // <--- E NOVO AQUI
                 
                 let nomeLimpo = arquivo.name.replace(/\.[^/.]+$/, "");
                 document.getElementById('appTitle').innerText = 'SimpleSheet - ' + nomeLimpo;
@@ -2030,7 +2117,7 @@
                 let linea = []; 
                 const celulas = linhas[i].querySelectorAll("td");
                 for (let j = 0; j <= maxColuna; j++) {
-                    let textoPuro = celulas[j].innerText;
+                    let textoPuro = celulas[j].dataset.raw !== undefined ? celulas[j].dataset.raw : celulas[j].innerText;
                     
                     if (formatoAtual === 'csv' || formatoAtual === 'csv_global') {
                         let textoEscapado = textoPuro.replace(/"/g, '""');
@@ -2470,6 +2557,253 @@
                 alert("Nenhuma correspondência encontrada para substituir.");
             }
         }
-	</script>
+		
+		// --- NOVO: MOTOR MATEMÁTICO (FÓRMULAS BÁSICAS) ---
+        function letraParaNumero(letras) {
+            let num = 0;
+            for (let i = 0; i < letras.length; i++) {
+                num = num * 26 + (letras.charCodeAt(i) - 64);
+            }
+            return num - 1; // Base 0 para o array
+        }
+
+        function refParaCoords(ref) {
+            let match = ref.match(/^([A-Z]+)([0-9]+)$/);
+            if (!match) return null;
+            return { c: letraParaNumero(match[1]), r: parseInt(match[2], 10) - 1 };
+        }
+
+        function avaliarFormula(formulaStr, visitados = []) {
+            try {
+                // Tira o '=' e joga tudo pra maiúsculo (ex: =a1+b1 vira A1+B1)
+                let expressao = formulaStr.substring(1).toUpperCase();
+                
+                expressao = expressao.replace(/[A-Z]+[0-9]+/g, function(ref) {
+                    let coords = refParaCoords(ref);
+                    if (!coords) return 0;
+                    
+                    let idCelula = coords.r + ',' + coords.c;
+                    if (visitados.includes(idCelula)) throw "CICLO"; // Evita travamento por referência circular
+                    
+                    let tr = document.getElementById('corpoTabela').children[coords.r];
+                    if (!tr) return 0;
+                    let tdRef = tr.children[coords.c + 1];
+                    if (!tdRef) return 0;
+
+                    // Busca o valor cru (fórmula) ou o texto se não tiver cru
+                    let valRaw = tdRef.dataset.raw !== undefined ? tdRef.dataset.raw : tdRef.innerText;
+                    
+                    if (valRaw.toString().startsWith('=')) {
+                        return avaliarFormula(valRaw, visitados.concat(idCelula)); // Cascata
+                    }
+                    
+                    let num = parseFloat(valRaw.toString().replace(',', '.'));
+                    return isNaN(num) ? 0 : num;
+                });
+                
+                // HIGIENE DE SEGURANÇA: Bloqueia palavras/códigos, só permite números e operadores matemáticos
+                if (!/^[0-9+\-*/().\s]+$/.test(expressao)) throw "INVÁLIDO";
+                
+                let resultado = new Function('return ' + expressao)();
+                
+                // Arredonda para evitar dízimas absurdas do JavaScript (ex: 0.1+0.2 = 0.30000000000000004)
+                return (typeof resultado === 'number') ? (Math.round(resultado * 1000000) / 1000000) : resultado;
+            } catch (e) {
+                return "#ERRO!";
+            }
+        }
+
+        function atualizarTodasAsFormulas() {
+            const tbody = document.getElementById('corpoTabela');
+            for (let r = 0; r < totalLinhas; r++) {
+                const tr = tbody.children[r];
+                if (!tr) continue;
+                for (let c = 0; c < totalColunas; c++) {
+                    const td = tr.children[c + 1];
+                    if (!td) continue;
+                    
+                    let raw = td.dataset.raw !== undefined ? td.dataset.raw : td.innerText;
+                    
+                    if (raw && raw.toString().startsWith('=')) {
+                        td.innerText = avaliarFormula(raw); // Mostra o cálculo na frente
+                    } else if (td.dataset.raw !== undefined) {
+                        td.innerText = td.dataset.raw; // Mostra o texto normal
+                    }
+                }
+            }
+        }
+		
+		// --- NOVO: CONSTRUTOR DE FÓRMULAS RÁPIDO ---
+        let referenciasCopiadas = [];
+
+        function converterParaCoordenada(linhaIndex, colIndex) {
+            let letra = '';
+            let c = colIndex;
+            while (c >= 0) {
+                letra = String.fromCharCode(65 + (c % 26)) + letra;
+                c = Math.floor(c / 26) - 1;
+            }
+            return letra + (linhaIndex + 1);
+        }
+
+        function copiarPosicoes() {
+            contextMenuCelula.style.display = 'none'; // Fecha o menu
+            referenciasCopiadas = [];
+            
+            let detectouTextoInvalido = false;
+            
+            // Varredura de segurança: analisa cada célula antes de aprovar a cópia
+            for (let i = 0; i < selectedCells.length; i++) {
+                let td = selectedCells[i];
+                // Pega o valor real (fórmula do dataset ou texto da tela)
+                let valor = td.dataset.raw !== undefined ? td.dataset.raw : td.innerText;
+                valor = valor.trim();
+
+                let isVazia = valor === '';
+                let isFormula = valor.startsWith('=');
+                let isNumero = !isNaN(Number(valor)); // Retorna true apenas se for um número válido (sem letras)
+
+                // Se a célula NÃO for vazia, NÃO for fórmula e NÃO for número... é um texto inválido.
+                if (!isVazia && !isFormula && !isNumero) {
+                    detectouTextoInvalido = true;
+                    break; // Aborta a varredura imediatamente
+                }
+                
+                let pos = getRowCol(td);
+                referenciasCopiadas.push(converterParaCoordenada(pos.r, pos.c));
+            }
+            
+            // TRAVA DE SEGURANÇA 1: Se detectou texto, bloqueia tudo.
+            if (detectouTextoInvalido) {
+                referenciasCopiadas = []; // Esvazia a memória por segurança
+                alert("Cópia bloqueada: Você selecionou células contendo texto. Selecione apenas números ou fórmulas.");
+                return; // Encerra a função aqui, não limpa a seleção para você ver onde está o erro.
+            }
+            
+            // --- NOVA TRAVA DE SEGURANÇA 2: Exige no mínimo 2 células para cálculo ---
+            if (referenciasCopiadas.length < 2) {
+                referenciasCopiadas = []; // Esvazia a memória por segurança
+                alert("Selecione pelo menos 2 células contendo números ou fórmulas para criar um cálculo.");
+                return;
+            }
+            
+			// BÔNUS: Copia também para o "Ctrl+C" do Windows
+            let textoClipboard = referenciasCopiadas.join(' '); 
+            navigator.clipboard.writeText(textoClipboard).catch(e => console.log("Erro no clipboard", e));
+			
+            // Se o código chegou até aqui, passou na segurança. Finaliza a cópia.
+            clearSelection(); 
+            if (celulaAtual) {
+                celulaAtual.classList.remove('active-focus');
+                atualizarMirasVisuais(null);
+            }
+        }
+
+        function colarFormulaRapida(operador) {
+            contextMenuCelula.style.display = 'none'; // Fecha o menu
+            
+            // --- TRAVA DE SEGURANÇA ATUALIZADA: Evita erro e exige no mínimo 2 coordenadas ---
+            if (!referenciasCopiadas || referenciasCopiadas.length < 2 || !celulaAtual) {
+                alert("São necessárias pelo menos 2 coordenadas na memória para um cálculo. Use 'Copiar Coordenadas para Cálculo' primeiro.");
+                return;
+            }
+
+            // Cria o texto, ex: =A1+B2+C3
+            let formulaPronta = '=' + referenciasCopiadas.join(operador);
+
+            if (isEditing) {
+                // MODO DE EDIÇÃO: Joga o texto da fórmula na tela para o usuário ver/editar
+                celulaAtual.innerText = formulaPronta;
+                
+                // Empurra o cursor piscante para o final do texto
+                const range = document.createRange(); 
+                const sel = window.getSelection();
+                range.selectNodeContents(celulaAtual); 
+                range.collapse(false); // false = colapsa no final
+                sel.removeAllRanges(); 
+                sel.addRange(range);
+            } else {
+                // MODO NORMAL (Fechado): Injeta no fundo, calcula e salva
+                celulaAtual.dataset.raw = formulaPronta;
+                atualizarTodasAsFormulas(); 
+                salvarEstado();
+            }
+        }
+		
+		// --- NOVO: LÓGICA DO CONSTRUTOR DE FÓRMULAS ASSISTIDO ---
+        function abrirConstrutorFormula() {
+            contextMenuCelula.style.display = 'none'; // Fecha menu
+
+            if (!referenciasCopiadas || referenciasCopiadas.length < 2 || !celulaAtual) {
+                alert("São necessárias pelo menos 2 coordenadas na memória. Use 'Copiar Coordenadas para Cálculo' primeiro.");
+                return;
+            }
+
+            let container = document.getElementById('conteudoConstrutor');
+            container.innerHTML = ''; // Limpa os dados do cálculo anterior
+
+            for (let i = 0; i < referenciasCopiadas.length; i++) {
+                // Caixinha da Célula (Estilo Win98)
+                let span = document.createElement('span');
+                span.innerText = referenciasCopiadas[i];
+                span.style.padding = '2px 6px';
+                span.style.background = 'white';
+                span.style.border = '2px inset #dfdfdf'; // Efeito afundado
+                span.style.fontWeight = 'bold';
+                container.appendChild(span);
+
+                // Menu Dropdown (Estilo Win98)
+                if (i < referenciasCopiadas.length - 1) {
+                    let select = document.createElement('select');
+                    select.className = 'operador-select';
+                    select.style.padding = '2px';
+                    select.style.fontFamily = "'MS Sans Serif', sans-serif";
+                    select.style.border = '2px outset #dfdfdf';
+                    select.style.cursor = 'pointer';
+                    select.innerHTML = `
+                        <option value="+"> + </option>
+                        <option value="-"> - </option>
+                        <option value="*"> * </option>
+                        <option value="/"> / </option>
+                    `;
+                    container.appendChild(select);
+                }
+            }
+
+            document.getElementById('modalConstrutor').style.display = 'flex';
+        }
+
+        function fecharConstrutor() {
+            document.getElementById('modalConstrutor').style.display = 'none';
+        }
+
+        function aplicarFormulaConstrutor() {
+            let formulaFinal = '=';
+            let selects = document.querySelectorAll('.operador-select');
+            
+            for (let i = 0; i < referenciasCopiadas.length; i++) {
+                formulaFinal += referenciasCopiadas[i];
+                if (i < selects.length) {
+                    formulaFinal += selects[i].value;
+                }
+            }
+
+            if (isEditing) {
+                celulaAtual.innerText = formulaFinal;
+                const range = document.createRange(); 
+                const sel = window.getSelection();
+                range.selectNodeContents(celulaAtual); 
+                range.collapse(false);
+                sel.removeAllRanges(); 
+                sel.addRange(range);
+            } else {
+                celulaAtual.dataset.raw = formulaFinal;
+                atualizarTodasAsFormulas(); 
+                salvarEstado();
+            }
+            
+            fecharConstrutor(); 
+        }
+    </script>
 </body>
 </html>
