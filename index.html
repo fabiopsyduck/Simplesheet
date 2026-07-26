@@ -235,16 +235,19 @@
         td.active-focus { outline: 2px solid #000080; outline-offset: -2px; z-index: 1; position: relative; }
         
         /* --- NOVO: Bordas de Perímetro Dinâmicas combinando com a sua cor #000080 --- */
-        td.sel-top { box-shadow: inset 0 2px 0 0 #000080, inset 0 0 0 0 transparent !important; }
-        td.sel-bottom { box-shadow: inset 0 -2px 0 0 #000080, inset 0 0 0 0 transparent !important; }
-        td.sel-left { box-shadow: inset 2px 0 0 0 #000080, inset 0 0 0 0 transparent !important; }
-        td.sel-right { box-shadow: inset -2px 0 0 0 #000080, inset 0 0 0 0 transparent !important; }
-        
-        /* Combinações de Cantos para fechar o quadrado perfeitamente */
-        td.sel-top.sel-left { box-shadow: inset 2px 2px 0 0 #000080 !important; }
-        td.sel-top.sel-right { box-shadow: inset -2px 2px 0 0 #000080 !important; }
-        td.sel-bottom.sel-left { box-shadow: inset 2px -2px 0 0 #000080 !important; }
-        td.sel-bottom.sel-right { box-shadow: inset -2px -2px 0 0 #000080 !important; }
+        td.sel-top { --s-top: inset 0 2px 0 0 #000080; }
+        td.sel-bottom { --s-bottom: inset 0 -2px 0 0 #000080; }
+        td.sel-left { --s-left: inset 2px 0 0 0 #000080; }
+        td.sel-right { --s-right: inset -2px 0 0 0 #000080; }
+
+        /* Aplica todas as bordas necessárias ao mesmo tempo, sem que uma cancele a outra */
+        td.sel-top, td.sel-bottom, td.sel-left, td.sel-right {
+            box-shadow: 
+                var(--s-top, inset 0 0 0 0 transparent), 
+                var(--s-bottom, inset 0 0 0 0 transparent), 
+                var(--s-left, inset 0 0 0 0 transparent), 
+                var(--s-right, inset 0 0 0 0 transparent) !important;
+        }
         
         /* Proteção para impressão */
         @media print {
