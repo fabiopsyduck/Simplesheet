@@ -364,6 +364,27 @@
             font-weight: bold;
             pointer-events: none; /* Evita que o texto atrapalhe o clique */
         }
+		
+		/* --- NOVO: REDIMENSIONAMENTO DE COLUNAS --- */
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #c0c0c0; 
+            user-select: none;
+            position: relative; /* Necessário para ancorar a barra de redimensionamento */
+        }
+
+        /* Linha invisível na borda direita do cabeçalho que funciona como a "alça" do mouse */
+        thead th::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 5px;
+            height: 100%;
+            cursor: col-resize; /* Muda o cursor para a setinha dupla de redimensionar */
+        }
     </style>
 </head>
 <body>
@@ -403,7 +424,10 @@
         
         <button id="btnDesfazer" class="btn" title="Desfazer a última ação (Ctrl+Z)." onmousedown="event.preventDefault()" onclick="acaoDesfazer()" disabled>↩️</button>
         <button id="btnRefazer" class="btn" title="Refazer a última ação desfeita (Ctrl+Y)." onmousedown="event.preventDefault()" onclick="acaoRefazer()" disabled>↪️</button>
-
+        
+		<div class="separator"></div>
+        <button id="btnBuscar" class="btn" title="Localizar e Substituir dados na planilha (Ctrl+F ou Ctrl+H)" onmousedown="event.preventDefault()" onclick="abrirBuscaModal()">🔍 Localizar</button>
+		
         <div class="separator"></div>
         
         <fieldset class="grid-size">
@@ -522,6 +546,43 @@
         </div>
     </div>
 	
+    <!-- NOVO: JANELA DE LOCALIZAR E SUBSTITUIR (WIN98) -->
+    <div id="buscaModal" class="modal-overlay" style="display: none; align-items: flex-start; padding-top: 80px;">
+        <div class="window-dialog" style="width: 360px;">
+            <div class="dialog-title">
+                <span>Localizar e Substituir</span>
+                <div class="close-x" title="Fechar aba" onclick="fecharBuscaModal()">X</div>
+            </div>
+            <div class="window-body">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                    <label style="width: 90px;">Localizar:</label>
+                    <input type="text" id="inputLocalizar" style="flex: 1; border: 2px inset #dfdfdf; padding: 3px; font-family: 'MS Sans Serif', sans-serif;">
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
+                    <label style="width: 90px;">Substituir:</label>
+                    <input type="text" id="inputSubstituir" style="flex: 1; border: 2px inset #dfdfdf; padding: 3px; font-family: 'MS Sans Serif', sans-serif;">
+                </div>
+                <fieldset class="config-group" style="padding: 6px 10px; margin-bottom: 12px;">
+                    <legend>Opções</legend>
+                    <div class="config-option" style="margin-bottom: 0;">
+                        <input type="checkbox" id="chkMaiusculas">
+                        <label for="chkMaiusculas">Diferenciar maiúsculas e minúsculas</label>
+                    </div>
+                </fieldset>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <button class="btn" style="width: 48%; justify-content: center; font-weight: bold;" onclick="acaoLocalizarProximo()">Procurar Próxima</button>
+                        <button class="btn" style="width: 48%; justify-content: center;" onclick="acaoSubstituirAtual()">Substituir Atual</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <button class="btn" style="width: 48%; justify-content: center;" onclick="acaoSubstituirTudo()">Substituir Tudo</button>
+                        <button class="btn" style="width: 48%; justify-content: center;" onclick="fecharBuscaModal()">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="contextMenuCabecalho" class="context-menu" style="display: none;">
         <div id="menuCol" style="display: none;">
             <div class="menu-item" onclick="acaoEstrutural('col', 'inserirEsq')">Inserir Coluna à Esquerda</div>
@@ -1583,6 +1644,13 @@
                 if (e.key.toLowerCase() === 'z') { if(!isEditing) { e.preventDefault(); acaoDesfazer(); } return; }
                 if (e.key.toLowerCase() === 'y') { if(!isEditing) { e.preventDefault(); acaoRefazer(); } return; }
                 
+                // --- ATALHO NOVO: BUSCA E SUBSTITUIÇÃO ---
+                if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'h') {
+                    e.preventDefault(); // Impede que o navegador abra a caixinha feia dele
+                    abrirBuscaModal();
+                    return;
+                }
+
                 // --- ATALHOS NOVOS: Pular para o começo ou fim da tabela (Ctrl + Home / End) ---
                 if (e.key === 'Home') { e.preventDefault(); moverSelecaoAbsoluta(0, 0); return; }
                 if (e.key === 'End') { e.preventDefault(); moverSelecaoAbsoluta(totalLinhas - 1, totalColunas - 1); return; }
@@ -2223,6 +2291,185 @@
             inicializarPlanilhaNativa(); 
             salvarEstado(); 
         };
-    </script>
+		
+		// --- NOVO: MOTOR DE REDIMENSIONAMENTO DE COLUNAS (QoL) CORRIGIDO ---
+        let thAtivoResize = null;
+        let inicioXResize = 0;
+        let larguraInicialResize = 0;
+
+        // Atrelamos o evento à tag permanente do cabeçalho, e não à linha que é recriada
+        document.getElementById('cabecalhoColunas').addEventListener('mousedown', function(e) {
+            if (gradeBloqueada) return; // Trava de segurança
+
+            // Verifica se o alvo exato clicado foi um TH e se foi na bordinha direita
+            if (e.target.tagName === 'TH' && !e.target.classList.contains('corner')) {
+                const rect = e.target.getBoundingClientRect();
+                
+                if (e.clientX >= rect.right - 6) {
+                    thAtivoResize = e.target;
+                    inicioXResize = e.clientX;
+                    larguraInicialResize = thAtivoResize.offsetWidth;
+                    
+                    document.addEventListener('mousemove', aoMoverMouseResize);
+                    document.addEventListener('mouseup', aoSoltarMouseResize);
+                    e.preventDefault(); // Evita selecionar o texto sem querer
+                }
+            }
+        });
+
+        function aoMoverMouseResize(e) {
+            if (!thAtivoResize) return;
+            let novaLargura = larguraInicialResize + (e.clientX - inicioXResize);
+            if (novaLargura < 30) novaLargura = 30; // Trava mínima
+
+            let indiceColuna = thAtivoResize.cellIndex;
+            const tbody = document.getElementById('corpoTabela');
+
+            // Aplica a largura no TH
+            thAtivoResize.style.width = novaLargura + 'px';
+            thAtivoResize.style.minWidth = novaLargura + 'px';
+            thAtivoResize.style.maxWidth = novaLargura + 'px';
+
+            // Aplica a mesma largura em todos os TDs abaixo dele
+            for (let i = 0; i < tbody.children.length; i++) {
+                let td = tbody.children[i].children[indiceColuna];
+                if (td) {
+                    td.style.width = novaLargura + 'px';
+                    td.style.minWidth = novaLargura + 'px';
+                    td.style.maxWidth = novaLargura + 'px';
+                }
+            }
+        }
+
+        function aoSoltarMouseResize() {
+            thAtivoResize = null;
+            document.removeEventListener('mousemove', aoMoverMouseResize);
+            document.removeEventListener('mouseup', aoSoltarMouseResize);
+        }
+    
+	    // --- NOVO: MOTOR DE BUSCA E SUBSTITUIÇÃO LOTE/INDIVIDUAL ---
+        function abrirBuscaModal() {
+            if (gradeBloqueada) return;
+            sairModoEdicao();
+            document.getElementById('buscaModal').style.display = 'flex';
+            
+            // Foca o cursor de texto na caixa "Localizar" automaticamente
+            setTimeout(() => document.getElementById('inputLocalizar').focus(), 50);
+        }
+
+        function fecharBuscaModal() {
+            document.getElementById('buscaModal').style.display = 'none';
+            if (celulaAtual) celulaAtual.focus();
+        }
+
+        // QoL: Se apertar Enter na caixa de Localizar, ele funciona como "Procurar Próxima"
+        document.getElementById('inputLocalizar').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); acaoLocalizarProximo(); }
+        });
+
+        function acaoLocalizarProximo() {
+            const tbody = document.getElementById('corpoTabela');
+            const termo = document.getElementById('inputLocalizar').value;
+            const difMaiusculas = document.getElementById('chkMaiusculas').checked;
+            
+            if (!termo) return;
+
+            // Inicia a busca a partir da célula seguinte à que estamos agora
+            let startR = currentRow;
+            let startC = currentCol + 1;
+            
+            if (startC >= totalColunas) { startC = 0; startR++; }
+            if (startR >= totalLinhas) startR = 0;
+
+            let achou = false;
+            let r = startR;
+            let c = startC;
+            
+            // Dá uma volta inteira na tabela
+            for (let i = 0; i < totalLinhas * totalColunas; i++) {
+                let tr = tbody.children[r];
+                let td = tr.children[c + 1];
+                let textoTd = td.innerText;
+                let textoBusca = termo;
+
+                // Desliga as maiusculas para facilitar a busca normal
+                if (!difMaiusculas) {
+                    textoTd = textoTd.toLowerCase();
+                    textoBusca = textoBusca.toLowerCase();
+                }
+
+                if (textoTd.includes(textoBusca)) {
+                    selecionarUmaCelula(td);
+                    achou = true;
+                    break;
+                }
+
+                c++;
+                if (c >= totalColunas) { c = 0; r++; if (r >= totalLinhas) r = 0; }
+            }
+
+            if (!achou) alert("Fim da busca. Termo não encontrado.");
+        }
+
+        function acaoSubstituirAtual() {
+            if (!celulaAtual) return;
+            const termo = document.getElementById('inputLocalizar').value;
+            const substituto = document.getElementById('inputSubstituir').value;
+            const difMaiusculas = document.getElementById('chkMaiusculas').checked;
+
+            if (!termo) return;
+
+            let textoTd = celulaAtual.innerText;
+            let regexFlags = difMaiusculas ? '' : 'i'; // i = case insensitive
+            
+            // Fuga de segurança para caracteres matemáticos virarem texto comum na busca
+            let termoEscapado = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            let regex = new RegExp(termoEscapado, regexFlags);
+
+            // Verifica se a célula tem o alvo. Se sim, substitui. Depois pula para a próxima.
+            if (regex.test(textoTd)) {
+                celulaAtual.innerText = textoTd.replace(regex, substituto);
+                salvarEstado(); // Grava no histórico (Desfazer/Ctrl+Z)
+                acaoLocalizarProximo();
+            } else {
+                acaoLocalizarProximo(); // Se não estava na célula certa, apenas procura a próxima
+            }
+        }
+
+        function acaoSubstituirTudo() {
+            const tbody = document.getElementById('corpoTabela');
+            const termo = document.getElementById('inputLocalizar').value;
+            const substituto = document.getElementById('inputSubstituir').value;
+            const difMaiusculas = document.getElementById('chkMaiusculas').checked;
+
+            if (!termo) return;
+
+            let regexFlags = difMaiusculas ? 'g' : 'gi'; // g = global (todas as ocorrências)
+            let termoEscapado = termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            let regex = new RegExp(termoEscapado, regexFlags);
+
+            let contagem = 0;
+
+            for (let r = 0; r < totalLinhas; r++) {
+                let tr = tbody.children[r];
+                for (let c = 0; c < totalColunas; c++) {
+                    let td = tr.children[c + 1];
+                    let textoTd = td.innerText;
+                    
+                    if (regex.test(textoTd)) {
+                        td.innerText = textoTd.replace(regex, substituto);
+                        contagem++;
+                    }
+                }
+            }
+
+            if (contagem > 0) {
+                salvarEstado(); // Salva toda a limpeza em lote como UMA ação no histórico
+                alert(`Concluído! O SimpleSheet fez ${contagem} substituições na planilha.`);
+            } else {
+                alert("Nenhuma correspondência encontrada para substituir.");
+            }
+        }
+	</script>
 </body>
 </html>
