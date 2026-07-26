@@ -656,10 +656,15 @@
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('*')">Multiplicar (*)</div>
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('/')">Dividir (/)</div>
                 
-                <!-- Divisória visual dentro do submenu -->
                 <div class="menu-separator"></div>
                 
-                <!-- A opção de cálculo avançado agora mora aqui dentro! -->
+                <!-- Novas Opções -->
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaEspecial('MEDIA')">Calcular Média</div>
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaEspecial('MIN')">Extrair Valor Mínimo</div>
+                <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaEspecial('MAX')">Extrair Valor Máximo</div>
+                
+                <div class="menu-separator"></div>
+                
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="abrirConstrutorFormula()">🛠️ Montar Cálculo Avançado</div>
             </div>
         </div>
@@ -2601,8 +2606,11 @@
                     return isNaN(num) ? 0 : num;
                 });
                 
-                // HIGIENE DE SEGURANÇA: Bloqueia palavras/códigos, só permite números e operadores matemáticos
-                if (!/^[0-9+\-*/().\s]+$/.test(expressao)) throw "INVÁLIDO";
+                // HIGIENE DE SEGURANÇA: Liberamos a vírgula (,) e as letras M, I, N, A, X
+                if (!/^[0-9+\-*/().,\sMINAX]+$/.test(expressao)) throw "INVÁLIDO";
+                
+                // TRADUÇÃO: Transforma o texto para os comandos nativos que o navegador entende
+                expressao = expressao.replace(/MIN/g, 'Math.min').replace(/MAX/g, 'Math.max');
                 
                 let resultado = new Function('return ' + expressao)();
                 
@@ -2699,31 +2707,40 @@
             }
         }
 
-        function colarFormulaRapida(operador) {
+        function colarFormulaEspecial(tipo) {
             contextMenuCelula.style.display = 'none'; // Fecha o menu
             
-            // --- TRAVA DE SEGURANÇA ATUALIZADA: Evita erro e exige no mínimo 2 coordenadas ---
+            // Trava de segurança idêntica à sua
             if (!referenciasCopiadas || referenciasCopiadas.length < 2 || !celulaAtual) {
-                alert("São necessárias pelo menos 2 coordenadas na memória para um cálculo. Use 'Copiar Coordenadas para Cálculo' primeiro.");
+                alert("São necessárias pelo menos 2 coordenadas na memória para um cálculo especial. Use 'Copiar Coordenadas para Cálculo' primeiro.");
                 return;
             }
 
-            // Cria o texto, ex: =A1+B2+C3
-            let formulaPronta = '=' + referenciasCopiadas.join(operador);
+            let formulaPronta = '';
+
+            // Constrói a fórmula dependendo da escolha
+            if (tipo === 'MEDIA') {
+                // Soma tudo entre parênteses e divide pela quantidade. Ex: =(A1+B2)/2
+                formulaPronta = '=(' + referenciasCopiadas.join('+') + ')/' + referenciasCopiadas.length;
+            } else if (tipo === 'MIN') {
+                // Usa vírgulas. Ex: =MIN(A1,B2)
+                formulaPronta = '=MIN(' + referenciasCopiadas.join(',') + ')';
+            } else if (tipo === 'MAX') {
+                // Usa vírgulas. Ex: =MAX(A1,B2)
+                formulaPronta = '=MAX(' + referenciasCopiadas.join(',') + ')';
+            }
 
             if (isEditing) {
-                // MODO DE EDIÇÃO: Joga o texto da fórmula na tela para o usuário ver/editar
+                // MODO DE EDIÇÃO
                 celulaAtual.innerText = formulaPronta;
-                
-                // Empurra o cursor piscante para o final do texto
                 const range = document.createRange(); 
                 const sel = window.getSelection();
                 range.selectNodeContents(celulaAtual); 
-                range.collapse(false); // false = colapsa no final
+                range.collapse(false);
                 sel.removeAllRanges(); 
                 sel.addRange(range);
             } else {
-                // MODO NORMAL (Fechado): Injeta no fundo, calcula e salva
+                // MODO NORMAL (Fechado)
                 celulaAtual.dataset.raw = formulaPronta;
                 atualizarTodasAsFormulas(); 
                 salvarEstado();
