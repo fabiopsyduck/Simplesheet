@@ -388,7 +388,6 @@
             z-index: 10;
             background-color: #c0c0c0; 
             user-select: none;
-            position: relative; /* Necessário para ancorar a barra de redimensionamento */
         }
 
         /* Linha invisível na borda direita do cabeçalho que funciona como a "alça" do mouse */
@@ -767,7 +766,53 @@
             selectedCells = [];
             document.querySelectorAll('.mass-selected').forEach(el => el.classList.remove('mass-selected'));
         }
+        
+		// --- MOTOR DE CÂMERA INTELIGENTE (Medição Dinâmica) ---
+        function focarCelula(td) {
+            const container = document.getElementById('gridContainer');
+            const containerRect = container.getBoundingClientRect();
+            const tdRect = td.getBoundingClientRect();
 
+            // 1. O SEGREDO ESTÁ AQUI: Lê o tamanho EXATO e real das barras na sua interface
+            const celulaNumero = td.parentElement.firstElementChild; // Pega a célula do número (1, 2, 3...)
+            const cabecalhoLetras = td.closest('table').querySelector('tr'); // Pega a linha superior (A, B, C...)
+            
+            // Extrai a largura/altura real. Se por algum motivo não achar, usa 50/30 como margem de segurança.
+            const larguraReal = celulaNumero ? celulaNumero.getBoundingClientRect().width : 50;
+            const alturaReal = cabecalhoLetras ? cabecalhoLetras.getBoundingClientRect().height : 30;
+
+            // 2. Descobre a posição absoluta da célula
+            const absEsq = container.scrollLeft + (tdRect.left - containerRect.left);
+            const absDir = absEsq + tdRect.width;
+            const absTopo = container.scrollTop + (tdRect.top - containerRect.top);
+            const absBase = absTopo + tdRect.height;
+
+            // 3. Define os limites de visão usando as medidas REAIS que acabamos de capturar
+            const visaoEsq = container.scrollLeft + larguraReal;
+            const visaoDir = container.scrollLeft + container.clientWidth;
+            const visaoTopo = container.scrollTop + alturaReal;
+            const visaoBase = container.scrollTop + container.clientHeight;
+
+            let novoScrollX = container.scrollLeft;
+            let novoScrollY = container.scrollTop;
+
+            // 4. Calcula colisões e ajusta
+            if (absEsq < visaoEsq) {
+                novoScrollX = absEsq - larguraReal; // Desconta a largura real exata da barra de números
+            } else if (absDir > visaoDir) {
+                novoScrollX = absDir - container.clientWidth;
+            }
+
+            if (absTopo < visaoTopo) {
+                novoScrollY = absTopo - alturaReal; // Desconta a altura real exata da barra de letras
+            } else if (absBase > visaoBase) {
+                novoScrollY = absBase - container.clientHeight;
+            }
+
+            // Move a tela perfeitamente
+            container.scrollTo({ left: novoScrollX, top: novoScrollY, behavior: 'auto' });
+        }
+		
         function verificarRestricoesInterface() {
             const btnRecortar = document.getElementById('btnRecortarTopo');
             const btnCopiar = document.getElementById('btnCopiarTopo');
@@ -808,7 +853,7 @@
             currentCol = pos.c;
             valorPreEdicao = celulaAtual.dataset.raw !== undefined ? celulaAtual.dataset.raw : celulaAtual.innerText;
             
-            td.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            focarCelula(td);
             atualizarMirasVisuais(td);
             
             verificarRestricoesInterface();
@@ -904,7 +949,7 @@
             currentCol = pos.c;
             valorPreEdicao = celulaAtual.dataset.raw !== undefined ? celulaAtual.dataset.raw : celulaAtual.innerText;
             
-            celulaAtual.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+            focarCelula(celulaAtual);
             atualizarMirasVisuais(celulaAtual);
             
             if (manterEdicao) {
@@ -1873,7 +1918,7 @@
                     
                     // Rola a câmera para acompanhar a ponta da seleção
                     const tr = document.getElementById('corpoTabela').children[currentRow];
-                    tr.children[currentCol + 1].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+                    focarCelula(tr.children[currentCol + 1]);
                 }
                 return;
             }
