@@ -620,6 +620,27 @@
         </div>
     </div>
 	
+	<!-- NOVO: JANELA DE PORCENTAGEM (WIN98) -->
+    <div id="modalPorcentagem" class="modal-overlay" style="display: none; z-index: 3000;">
+        <div class="window-dialog" style="width: 260px;">
+            <div class="dialog-title">
+                <span>Definir Porcentagem</span>
+                <div class="close-x" title="Fechar aba" onclick="fecharModalPorcentagem()">X</div>
+            </div>
+            <div class="window-body" style="text-align: center;">
+                <p id="txtDescricaoPorcentagem" style="margin-top: 0; font-size: 11px; margin-bottom: 15px;">Digite a porcentagem (%):</p>
+                
+                <input type="text" id="inputPorcentagem" class="input-number-win98" style="width: 60px; font-size: 14px; padding: 4px; text-align: center;" value="10" onkeydown="if(event.key === 'Enter') confirmarPorcentagem()">
+                <span style="font-weight: bold; font-size: 14px; margin-left: 5px;">%</span>
+                
+                <div class="window-footer" style="margin-top: 20px; justify-content: center;">
+                    <button class="btn" style="font-weight: bold; width: 80px; justify-content: center;" onclick="confirmarPorcentagem()">OK</button>
+                    <button class="btn" style="width: 80px; justify-content: center;" onclick="fecharModalPorcentagem()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+	
     <div id="contextMenuCabecalho" class="context-menu" style="display: none;">
         <div id="menuCol" style="display: none;">
             <div class="menu-item" onclick="acaoEstrutural('col', 'inserirEsq')">Inserir Coluna à Esquerda</div>
@@ -655,6 +676,17 @@
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('-')">Subtrair (-)</div>
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('*')">Multiplicar (*)</div>
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('/')">Dividir (/)</div>
+                
+                <div class="menu-separator"></div>
+                
+                <!-- NOVO: Porcentagem com Submenu em cascata -->
+                <div class="menu-item has-submenu">
+                    Porcentagem (%) ►
+                    <div class="submenu-flutuante">
+                        <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarPorcentagem('EXTRAIR')">Extrair Valor (Parte do Todo)</div>
+                        <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarPorcentagem('ACRESCIMO')">Adicionar Acréscimo (+)</div>
+                    </div>
+                </div>
                 
                 <div class="menu-separator"></div>
                 
@@ -711,7 +743,16 @@
         let isDragging = false;
         let dragStartRow = -1;
         let dragStartCol = -1;
-
+        
+		// --- VARIÁVEIS DE AUTO-SCROLL DA SELEÇÃO ---
+        let scrollFrame = null;
+        let autoScrollX = 0;
+        let autoScrollY = 0;
+        let ultimoMouseX = 0;
+        let ultimoMouseY = 0;
+        const ZONA_GATILHO_SCROLL = 40; 
+        const VELOCIDADE_SCROLL = 15;
+		
         function getRowCol(td) {
             return {
                 r: td.parentElement.rowIndex - 1,
@@ -1599,7 +1640,63 @@
                 fecharDropdownsCor();
             }
         });
+        
+		// --- INÍCIO DO MOTOR DE AUTO-SCROLL ---
+        function loopAutoScroll() {
+            if (autoScrollX !== 0 || autoScrollY !== 0) {
+                // Rola a div da sua planilha
+                document.getElementById('gridContainer').scrollBy(autoScrollX, autoScrollY);
 
+                // O EFEITO ESTEIRA AGORA RECONHECE SELEÇÃO OU PINCEL:
+                let elementoSobMouse = document.elementFromPoint(ultimoMouseX, ultimoMouseY);
+                if (elementoSobMouse && elementoSobMouse.tagName === 'TD') {
+                    
+                    if (isDragging) {
+                        // Se estiver selecionando
+                        let pos = getRowCol(elementoSobMouse);
+                        selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, false);
+                        atualizarMirasVisuais(elementoSobMouse);
+                    } else if (isDraggingPincel) {
+                        // Se estiver pintando com o Pincel
+                        aplicarPintura(elementoSobMouse, dragPincelApagando);
+                    }
+                    
+                }
+                scrollFrame = requestAnimationFrame(loopAutoScroll);
+            } else {
+                pararAutoScroll();
+            }
+        }
+
+        function pararAutoScroll() {
+            if (scrollFrame) { cancelAnimationFrame(scrollFrame); scrollFrame = null; }
+            autoScrollX = 0;
+            autoScrollY = 0;
+        }
+
+        document.addEventListener('mousemove', function(e) {
+            ultimoMouseX = e.clientX;
+            ultimoMouseY = e.clientY;
+            
+            // CORREÇÃO AQUI: Agora o motor liga se estiver arrastando a seleção OU o pincel
+            if (!isDragging && !isDraggingPincel) return; 
+
+            autoScrollX = 0; autoScrollY = 0;
+            const container = document.getElementById('gridContainer');
+            const rect = container.getBoundingClientRect();
+
+            // Detecta colisão do mouse com as bordas da sua div 'gridContainer'
+            if (ultimoMouseX < rect.left + ZONA_GATILHO_SCROLL) autoScrollX = -VELOCIDADE_SCROLL;
+            else if (ultimoMouseX > rect.right - ZONA_GATILHO_SCROLL) autoScrollX = VELOCIDADE_SCROLL;
+
+            if (ultimoMouseY < rect.top + ZONA_GATILHO_SCROLL) autoScrollY = -VELOCIDADE_SCROLL;
+            else if (ultimoMouseY > rect.bottom - ZONA_GATILHO_SCROLL) autoScrollY = VELOCIDADE_SCROLL;
+
+            if ((autoScrollX !== 0 || autoScrollY !== 0) && !scrollFrame) loopAutoScroll();
+            else if (autoScrollX === 0 && autoScrollY === 0 && scrollFrame) pararAutoScroll();
+        });
+        // --- FIM DO MOTOR DE AUTO-SCROLL ---
+		
         // --- SISTEMA DE GESTÃO DO MOUSE ---
         const tabela = document.getElementById('planilha');
 
@@ -1671,6 +1768,7 @@
 
         document.addEventListener('mouseup', function() {
             isDragging = false;
+            pararAutoScroll(); // <--- COLE ESSA LINHA AQUI!
             
             // NOVO: Ao soltar o clique, o pincel termina o traço e grava no histórico
             if (isDraggingPincel) {
@@ -2663,18 +2761,16 @@
             // Varredura de segurança: analisa cada célula antes de aprovar a cópia
             for (let i = 0; i < selectedCells.length; i++) {
                 let td = selectedCells[i];
-                // Pega o valor real (fórmula do dataset ou texto da tela)
                 let valor = td.dataset.raw !== undefined ? td.dataset.raw : td.innerText;
                 valor = valor.trim();
 
                 let isVazia = valor === '';
                 let isFormula = valor.startsWith('=');
-                let isNumero = !isNaN(Number(valor)); // Retorna true apenas se for um número válido (sem letras)
+                let isNumero = !isNaN(Number(valor));
 
-                // Se a célula NÃO for vazia, NÃO for fórmula e NÃO for número... é um texto inválido.
                 if (!isVazia && !isFormula && !isNumero) {
                     detectouTextoInvalido = true;
-                    break; // Aborta a varredura imediatamente
+                    break; 
                 }
                 
                 let pos = getRowCol(td);
@@ -2683,23 +2779,21 @@
             
             // TRAVA DE SEGURANÇA 1: Se detectou texto, bloqueia tudo.
             if (detectouTextoInvalido) {
-                referenciasCopiadas = []; // Esvazia a memória por segurança
+                referenciasCopiadas = []; 
                 alert("Cópia bloqueada: Você selecionou células contendo texto. Selecione apenas números ou fórmulas.");
-                return; // Encerra a função aqui, não limpa a seleção para você ver onde está o erro.
+                return; 
             }
             
-            // --- NOVA TRAVA DE SEGURANÇA 2: Exige no mínimo 2 células para cálculo ---
-            if (referenciasCopiadas.length < 2) {
-                referenciasCopiadas = []; // Esvazia a memória por segurança
-                alert("Selecione pelo menos 2 células contendo números ou fórmulas para criar um cálculo.");
+            // --- NOVA TRAVA: Aceita 1 ou mais células (Removemos a restrição de < 2) ---
+            if (referenciasCopiadas.length === 0) {
+                alert("Nenhuma célula válida selecionada para copiar.");
                 return;
             }
             
-			// BÔNUS: Copia também para o "Ctrl+C" do Windows
+            // BÔNUS: Copia também para o "Ctrl+C" do Windows
             let textoClipboard = referenciasCopiadas.join(' '); 
             navigator.clipboard.writeText(textoClipboard).catch(e => console.log("Erro no clipboard", e));
-			
-            // Se o código chegou até aqui, passou na segurança. Finaliza a cópia.
+            
             clearSelection(); 
             if (celulaAtual) {
                 celulaAtual.classList.remove('active-focus');
@@ -2741,6 +2835,116 @@
                 sel.addRange(range);
             } else {
                 // MODO NORMAL (Fechado)
+                celulaAtual.dataset.raw = formulaPronta;
+                atualizarTodasAsFormulas(); 
+                salvarEstado();
+            }
+        }
+		
+		// --- LÓGICA DE PORCENTAGEM COM JANELA WIN98 (TRAVA SINGULAR) ---
+        let tipoPorcentagemAtual = null; // Memória para saber se é Extração ou Acréscimo
+
+        function colarPorcentagem(tipo) {
+            contextMenuCelula.style.display = 'none'; // Fecha o menu
+            
+            // A TRAVA SINGULAR: Só permite cálculo se exatamente 1 célula estiver na memória
+            if (!referenciasCopiadas || referenciasCopiadas.length !== 1 || !celulaAtual) {
+                alert("Para porcentagem, você deve copiar as coordenadas de EXATAMENTE 1 célula base.");
+                return;
+            }
+
+            tipoPorcentagemAtual = tipo;
+            
+            // Ajusta o texto da janelinha para ficar intuitivo
+            const txtDescricao = document.getElementById('txtDescricaoPorcentagem');
+            if (tipo === 'EXTRAIR') {
+                txtDescricao.innerText = "Extrair valor (Ex: 10% da base):";
+            } else {
+                txtDescricao.innerText = "Adicionar Acréscimo (Ex: +10%):";
+            }
+
+            // Exibe a NOSSA janela HTML em vez do prompt do navegador
+            document.getElementById('modalPorcentagem').style.display = 'flex';
+            document.getElementById('inputPorcentagem').value = "10"; // Padrão
+            
+            // Dá o foco automático na caixinha para o usuário só precisar digitar
+            setTimeout(() => {
+                let input = document.getElementById('inputPorcentagem');
+                input.focus();
+                input.select(); // Seleciona o "10" para ser fácil de apagar
+            }, 50);
+        }
+
+        function fecharModalPorcentagem() {
+            document.getElementById('modalPorcentagem').style.display = 'none';
+            tipoPorcentagemAtual = null;
+            if (celulaAtual) celulaAtual.focus();
+        }
+
+        function confirmarPorcentagem() {
+            let taxaStr = document.getElementById('inputPorcentagem').value;
+            
+            if (taxaStr === null || taxaStr.trim() === "") {
+                fecharModalPorcentagem();
+                return;
+            }
+            
+            let taxa = taxaStr.replace(',', '.'); // Previne erro se digitar vírgula
+            
+            if (isNaN(Number(taxa))) {
+                alert("Por favor, digite um número válido.");
+                return;
+            }
+
+            let base = referenciasCopiadas[0];
+            let formulaPronta = "";
+
+            // O motor matemático gera a string da fórmula
+            if (tipoPorcentagemAtual === 'EXTRAIR') {
+                formulaPronta = `=${base}*(${taxa}/100)`;
+            } else if (tipoPorcentagemAtual === 'ACRESCIMO') {
+                formulaPronta = `=${base}+(${base}*(${taxa}/100))`;
+            }
+
+            // Aplica na célula alvo
+            if (isEditing) {
+                celulaAtual.innerText = formulaPronta;
+                const range = document.createRange(); 
+                const sel = window.getSelection();
+                range.selectNodeContents(celulaAtual); 
+                range.collapse(false);
+                sel.removeAllRanges(); 
+                sel.addRange(range);
+            } else {
+                celulaAtual.dataset.raw = formulaPronta;
+                atualizarTodasAsFormulas(); 
+                salvarEstado();
+            }
+            
+            fecharModalPorcentagem(); // Fecha a janela no final
+        }
+
+        // --- CORREÇÃO: FUNÇÃO DE CÁLCULO RÁPIDO QUE FALTAVA (TRAVA MÚLTIPLA) ---
+        function colarFormulaRapida(operador) {
+            contextMenuCelula.style.display = 'none';
+            
+            // A TRAVA MÚLTIPLA: Impede soma ou divisão de 1 número só
+            if (!referenciasCopiadas || referenciasCopiadas.length < 2 || !celulaAtual) {
+                alert("São necessárias pelo menos 2 coordenadas na memória. Use 'Copiar Coordenadas para Cálculo' primeiro.");
+                return;
+            }
+
+            let formulaPronta = '=' + referenciasCopiadas.join(operador);
+
+            if (isEditing) {
+                celulaAtual.innerText = formulaPronta;
+                const range = document.createRange(); 
+                const sel = window.getSelection();
+                range.selectNodeContents(celulaAtual); 
+                range.collapse(false);
+                sel.removeAllRanges(); 
+                sel.addRange(range);
+            } else {
                 celulaAtual.dataset.raw = formulaPronta;
                 atualizarTodasAsFormulas(); 
                 salvarEstado();
