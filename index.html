@@ -292,6 +292,9 @@
         table.export-hide-headers thead { display: none !important; }
         table.export-hide-headers tbody th { display: none !important; }
         
+        /* NOVO: Derruba qualquer negrito que o Javascript tenha injetado nas células */
+        table.export-no-bold td { font-weight: normal !important; }
+        
         /* --- CABEÇALHOS E NÚMEROS FIXOS NA TELA (STICKY LIMPO) --- */
         thead { background-color: #c0c0c0; }
 
@@ -456,7 +459,7 @@
             <span class="rotulo-grupo">Visual / Exportar:</span>
             <button id="btnImprimir" class="btn" title="Imprime a planilha atual em papel ou PDF." onmousedown="event.preventDefault()" onclick="imprimir()">🖨️</button>
             <button id="btnScreenshot" class="btn" title="Captura uma imagem (Screenshot PNG) da planilha atual." onmousedown="event.preventDefault()" onclick="acaoScreenshot()">📸</button>
-            <button id="btnConfig" class="btn" title="Ajusta filtros e aparências para a Impressão e o Screenshot." onmousedown="event.preventDefault()" onclick="abrirConfigModal()">⚙️ Config. de Impressão</button>
+            <button id="btnConfig" class="btn" title="Ajusta filtros e aparências para a Impressão e o Screenshot." onmousedown="event.preventDefault()" onclick="abrirConfigModal()">⚙️ Config. de Exportação</button>
             <button id="btnPaleta" class="btn" title="Configurar cores para o pincel (Afeta apenas Foto/Impressão, não salva no arquivo)." onmousedown="event.preventDefault()" onclick="abrirPaletaModal()">🎨 Paleta</button>
             <button id="btnPincel" class="btn" title="Liga/Desliga o Pincel. (Esquerdo pinta, Direito apaga - Afeta apenas Foto/Impressão)." onmousedown="event.preventDefault()" onclick="togglePincel()">🖌️ Pincel</button>
         </div>
@@ -531,6 +534,12 @@
                     <div class="config-option" title="Oculta os cabeçalhos de coluna (A, B, C...) e de linha (1, 2, 3...) na exportação.">
                         <input type="checkbox" id="chkOcultarCabecalhos">
                         <label for="chkOcultarCabecalhos">Ocultar cabeçalhos de linha e coluna</label>
+                    </div>
+
+                    <!-- NOVO: BOTÃO DE DESATIVAR NEGRITO -->
+                    <div class="config-option" title="Desativa o negrito automático dos cálculos na hora de exportar a imagem ou imprimir.">
+                        <input type="checkbox" id="chkSemNegrito">
+                        <label for="chkSemNegrito">Remover negrito dos cálculos</label>
                     </div>
 
                     <div class="config-option" title="Analisa a planilha e esconde as áreas vazias automáticas, exportando apenas o seu conteúdo.">
@@ -1059,6 +1068,7 @@
                 tableEl.classList.remove('export-hide-grid');
                 tableEl.classList.remove('export-hide-headers');
                 tableEl.classList.remove('export-modo-seguro'); // Remove o escudo anti-sticky
+                tableEl.classList.remove('export-no-bold'); // <--- NOVO: Restaura o negrito para a tela
                 
                 document.querySelectorAll('.export-crop-hide').forEach(el => {
                     el.style.display = '';
@@ -1089,6 +1099,10 @@
             }
             if (document.getElementById('chkOcultarCabecalhos').checked) {
                 tableEl.classList.add('export-hide-headers');
+            }
+            // ---> NOVO: Ativa o escudo anti-negrito para a foto/papel
+            if (document.getElementById('chkSemNegrito').checked) {
+                tableEl.classList.add('export-no-bold');
             }
             
             // MÁQUINA DE RECORTE 360 GRAUS (Bounding Box)
@@ -3014,8 +3028,12 @@
                     
                     if (raw && raw.toString().startsWith('=')) {
                         td.innerText = avaliarFormula(raw); // Mostra o cálculo na frente
+                        td.style.fontWeight = 'bold'; // <--- NOVO: Deixa o cálculo em negrito
                     } else if (td.dataset.raw !== undefined) {
                         td.innerText = td.dataset.raw; // Mostra o texto normal
+                        td.style.fontWeight = 'normal'; // <--- NOVO: Garante que texto comum não fique em negrito
+                    } else {
+                        td.style.fontWeight = 'normal'; // <--- NOVO: Limpa o formato de células vazias recém-criadas
                     }
                 }
             }
