@@ -216,13 +216,22 @@
         .grid-container { flex: 1; background-color: #808080; overflow: auto; position: relative; }
         
         table { 
-            border-collapse: collapse; 
+            border-collapse: separate; /* A CURA: Impede que o navegador mate o Sticky */
+            border-spacing: 0; 
             background-color: white; 
             table-layout: auto; 
+            /* Fecha a tabela externa para não vazar a cor cinza de fundo */
+            border-left: 1px solid #d0d0d0;
+            border-top: 1px solid #d0d0d0;
         }
 
         th, td {
-            border: 1px solid #d0d0d0;
+            /* A NOVA GRELHA (Funciona 100% com o separate) */
+            border-right: 1px solid #d0d0d0;
+            border-bottom: 1px solid #d0d0d0;
+            border-top: none;
+            border-left: none;
+            
             height: 20px;
             min-width: 80px; 
             font-size: 12px;
@@ -232,16 +241,23 @@
             box-sizing: border-box; 
             line-height: 18px; 
             vertical-align: middle; 
+            background-clip: padding-box; /* Protege a cor branca de borrar durante o scroll */
         }
 
-        th { background-color: #c0c0c0; border: 1px outset #ffffff; font-weight: normal; text-align: center; cursor: pointer; }
+        th { 
+            background-color: #c0c0c0; 
+            border: 1px outset #ffffff !important; /* Win98 style vence o cinza do grid */
+            font-weight: normal; 
+            text-align: center; 
+            cursor: pointer; 
+        }
         
         .corner { 
             width: 30px !important; 
             min-width: 30px !important; 
             max-width: 30px !important; 
             background-color: #c0c0c0; 
-            border: 1px outset #ffffff; 
+            border: 1px outset #ffffff !important; 
             cursor: default; 
         }
 
@@ -250,13 +266,12 @@
         td.selected { background-color: #cce8ff; }
         td.active-focus { outline: 2px solid #000080; outline-offset: -2px; z-index: 1; position: relative; }
         
-        /* --- NOVO: Bordas de Perímetro Dinâmicas combinando com a sua cor #000080 --- */
+        /* --- Bordas de Perímetro Dinâmicas --- */
         td.sel-top { --s-top: inset 0 2px 0 0 #000080; }
         td.sel-bottom { --s-bottom: inset 0 -2px 0 0 #000080; }
         td.sel-left { --s-left: inset 2px 0 0 0 #000080; }
         td.sel-right { --s-right: inset -2px 0 0 0 #000080; }
 
-        /* Aplica todas as bordas necessárias ao mesmo tempo, sem que uma cancele a outra */
         td.sel-top, td.sel-bottom, td.sel-left, td.sel-right {
             box-shadow: 
                 var(--s-top, inset 0 0 0 0 transparent), 
@@ -265,27 +280,27 @@
                 var(--s-right, inset 0 0 0 0 transparent) !important;
         }
         
-        /* Proteção para impressão */
         @media print {
             td.sel-top, td.sel-bottom, td.sel-left, td.sel-right { box-shadow: none !important; }
         }
 
-        /* --- Mantendo o restante do seu código intacto --- */
         td.editing { outline: 2px solid black; outline-offset: -2px; background-color: white; cursor: text; user-select: text; z-index: 2; position: relative; }
         td.mass-selected { background-color: #cce8ff; } 
-        th.header-highlight { background-color: #a0a0a0; border: 1px inset #ffffff; font-weight: bold; }
+        th.header-highlight { background-color: #a0a0a0; border: 1px inset #ffffff !important; font-weight: bold; }
 
-        table.export-hide-grid td { border-color: transparent !important; }
+        table.export-hide-grid td { border-right: none !important; border-bottom: none !important; }
         table.export-hide-headers thead { display: none !important; }
         table.export-hide-headers tbody th { display: none !important; }
         
-		/* --- NOVO: CABEÇALHOS E NÚMEROS FIXOS NA TELA (STICKY) --- */
+        /* --- CABEÇALHOS E NÚMEROS FIXOS NA TELA (STICKY LIMPO) --- */
+        thead { background-color: #c0c0c0; }
+
         thead th {
             position: sticky;
             top: 0;
             z-index: 10;
-            /* Garante que o fundo cinza bloqueie a visão do texto rolando por baixo */
             background-color: #c0c0c0; 
+            /* Hack sujo de transform removido. Com o separate ele já cola perfeitamente. */
         }
 
         tbody th {
@@ -295,12 +310,12 @@
             background-color: #c0c0c0;
         }
 
-        /* O quadradinho do canto superior esquerdo precisa ficar acima de tudo */
         thead th.corner {
             position: sticky;
             top: 0;
             left: 0;
             z-index: 20; 
+            background-color: #c0c0c0;
         }
 		
 		/* --- ESTILOS DO PINCEL E PALETA (NOVO) --- */
@@ -399,6 +414,23 @@
             width: 5px;
             height: 100%;
             cursor: col-resize; /* Muda o cursor para a setinha dupla de redimensionar */
+        }
+		
+		/* --- LIBERA O TAMANHO DA COLUNA DE NÚMEROS (PASSO 3) --- */
+        #planilha tbody th, 
+        #planilha thead th.corner {
+            width: auto !important;
+            min-width: 30px !important;
+            max-width: none !important; /* Destrói a trava de 30px da classe .corner */
+            padding-left: 5px;
+            padding-right: 5px;
+            white-space: nowrap;
+        }
+		
+		/* --- PROTEÇÃO ABSOLUTA PARA EXPORTAÇÃO (FOTO E IMPRESSÃO) --- */
+        table.export-modo-seguro th, 
+        table.export-modo-seguro td {
+            position: static !important; /* Desliga todo o sticky para o html2canvas não bugar */
         }
     </style>
 </head>
@@ -642,6 +674,9 @@
 	
     <div id="contextMenuCabecalho" class="context-menu" style="display: none;">
         <div id="menuCol" style="display: none;">
+            <div id="btnCongelarCol" class="menu-item" onclick="acaoCongelar('col')">❄️ Congelar até aqui</div>
+            <div id="btnDescongelarCol" class="menu-item" onclick="acaoDescongelar('col')">🔥 Descongelar Colunas</div>
+            <div class="menu-separator"></div>
             <div class="menu-item" onclick="acaoEstrutural('col', 'inserirEsq')">Inserir Coluna à Esquerda</div>
             <div class="menu-item" onclick="acaoEstrutural('col', 'inserirDir')">Inserir Coluna à Direita</div>
             <div class="menu-separator"></div>
@@ -649,6 +684,9 @@
             <div class="menu-item" onclick="acaoEstrutural('col', 'apagar')">Apagar Coluna</div>
         </div>
         <div id="menuRow" style="display: none;">
+            <div id="btnCongelarRow" class="menu-item" onclick="acaoCongelar('row')">❄️ Congelar até aqui</div>
+            <div id="btnDescongelarRow" class="menu-item" onclick="acaoDescongelar('row')">🔥 Descongelar Linhas</div>
+            <div class="menu-separator"></div>
             <div class="menu-item" onclick="acaoEstrutural('row', 'inserirAcima')">Inserir Linha Acima</div>
             <div class="menu-item" onclick="acaoEstrutural('row', 'inserirAbaixo')">Inserir Linha Abaixo</div>
             <div class="menu-separator"></div>
@@ -963,15 +1001,42 @@
             const tabela = document.getElementById('planilha');
             if (!container || !tabela) return;
 
-            // Mantém a trava de segurança (30px da coluna de números + 80px por coluna de dados)
-            const larguraMinimaSegura = 30 + (totalColunas * 80);
+            // Descobre a largura atual da coluna de números (se não achar, usa 30 por segurança)
+            const celulaNumeros = document.querySelector('#cabecalhoColunas th:first-child');
+            const larguraNumeros = celulaNumeros ? celulaNumeros.offsetWidth : 30;
+            
+            // Mantém a trava de segurança dinâmica + 80px por coluna de dados
+            const larguraMinimaSegura = larguraNumeros + (totalColunas * 80);
 
-            // Delega a responsabilidade de leitura de conteúdo ao motor do navegador
-            tabela.style.width = 'auto'; // Ajusta a largura de forma justa ao conteúdo digitado
-            tabela.style.minWidth = larguraMinimaSegura + 'px'; // Impede o esmagamento abaixo do padrão
+            // MUDANÇA AQUI: 100% força a tabela a esticar e engolir as bordas cinzas vazias
+            tabela.style.width = '100%'; 
+            tabela.style.height = '100%'; // NOVO: Também estica para baixo tapando o fundo cinza vertical
+            tabela.style.minWidth = larguraMinimaSegura + 'px'; // Continua protegendo contra esmagamento
+
+            // --- NOVO: Recalcula a barreira de congelamento se a tela mudar de tamanho ---
+            if (typeof estadoCongelamento !== 'undefined' && estadoCongelamento.ativo) {
+                atualizarEstilosCongelamento();
+            }
         }
 
         window.addEventListener('resize', ajustarZoomDinamico);
+
+        // =========================================================
+        // PASSO 1: MONITOR DE ROLAGEM PARA O CONGELAMENTO DE PAINÉIS
+        // =========================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabela = document.getElementById('planilha');
+            const containerRolagem = tabela.parentElement; 
+
+            containerRolagem.addEventListener('scroll', function() {
+                if (this.scrollLeft > 0) tabela.classList.add('is-scrolled-x');
+                else tabela.classList.remove('is-scrolled-x');
+            
+                if (this.scrollTop > 0) tabela.classList.add('is-scrolled-y');
+                else tabela.classList.remove('is-scrolled-y');
+            });
+        });
+        // =========================================================
 
         // --- CONTROLE DA JANELA MODAL ---
         function abrirConfigModal() {
@@ -993,17 +1058,29 @@
                 // Modo Edição: Restaura todos os visuais
                 tableEl.classList.remove('export-hide-grid');
                 tableEl.classList.remove('export-hide-headers');
+                tableEl.classList.remove('export-modo-seguro'); // Remove o escudo anti-sticky
+                
                 document.querySelectorAll('.export-crop-hide').forEach(el => {
                     el.style.display = '';
                     el.classList.remove('export-crop-hide');
                 });
+                
+                // DEVOLVE O CONGELAMENTO SE ELE ESTAVA ATIVO
+                if (typeof estadoCongelamento !== 'undefined' && estadoCongelamento.ativo) {
+                    tableEl.classList.add('is-frozen');
+                }
                 
                 // RESTAURA as travas de largura do Zoom Dinâmico
                 ajustarZoomDinamico();
                 return;
             }
             
-            // MODO EXPORTAÇÃO: Remove as travas elásticas temporariamente.
+            // MODO EXPORTAÇÃO: Prepara a tabela para a foto/papel
+            tableEl.classList.add('export-modo-seguro'); // Ativa o escudo anti-sticky
+            
+            // REMOVE O CONGELAMENTO TEMPORARIAMENTE
+            tableEl.classList.remove('is-frozen');
+
             tableEl.style.width = '';
             tableEl.style.minWidth = '';
             
@@ -1038,13 +1115,11 @@
                 
                 // 2. Se houver algum texto na tabela, aplica o corte
                 if (maxL !== -1 && maxC !== -1) {
-                    // Calcula os limites reais adicionando a folga para os 4 lados
                     let startRow = Math.max(0, minL - folga);
                     let endRow = Math.min(totalLinhas - 1, maxL + folga);
                     let startCol = Math.max(0, minC - folga);
                     let endCol = Math.min(totalColunas - 1, maxC + folga);
                     
-                    // Oculta tudo que estiver ANTES do teto ou DEPOIS do piso
                     for (let r = 0; r < totalLinhas; r++) {
                         if (r < startRow || r > endRow) {
                             if (tbody.children[r]) {
@@ -1052,7 +1127,6 @@
                                 tbody.children[r].classList.add('export-crop-hide');
                             }
                         } else {
-                            // Para as linhas que sobreviveram, oculta as células ANTES da parede esquerda ou DEPOIS da parede direita
                             for (let c = 0; c < totalColunas; c++) {
                                 if (c < startCol || c > endCol) {
                                     if (tbody.children[r] && tbody.children[r].children[c + 1]) {
@@ -1062,14 +1136,13 @@
                                 }
                             }
                         }
-                    }
-                    
-                    // Aplica o mesmo corte de parede esquerda e direita para os Cabeçalhos (A, B, C...)
-                    for (let c = 0; c < totalColunas; c++) {
-                        if (c < startCol || c > endCol) {
-                            if (theadTr.children[c + 1]) {
-                                theadTr.children[c + 1].style.display = 'none';
-                                theadTr.children[c + 1].classList.add('export-crop-hide');
+                        
+                        for (let c = 0; c < totalColunas; c++) {
+                            if (c < startCol || c > endCol) {
+                                if (theadTr.children[c + 1]) {
+                                    theadTr.children[c + 1].style.display = 'none';
+                                    theadTr.children[c + 1].classList.add('export-crop-hide');
+                                }
                             }
                         }
                     }
@@ -1198,6 +1271,8 @@
             gradeBloqueada = false;
             document.getElementById('welcomeOverlay').style.display = 'none'; // FAZ A JANELA SUMIR
             
+			acaoDescongelar();
+			
             totalColunas = Math.max(15, baseColunasTela);
             totalLinhas = Math.max(30, baseLinhasTela);
             
@@ -1343,6 +1418,11 @@
         function acaoEstrutural(tipo, acao) {
             contextMenuCabecalho.style.display = 'none';
             sairModoEdicao();
+            
+            // TRAVA NOVA: Descongela a tela automaticamente se o usuário adicionar ou apagar linhas/colunas
+            // Isso evita que a parede de congelamento fique "flutuando" no lugar errado
+            if (estadoCongelamento.ativo) acaoDescongelar();
+            
             const tbody = document.getElementById('corpoTabela');
             const theadTr = document.getElementById('cabecalhoColunas').firstElementChild;
 
@@ -1626,8 +1706,7 @@
         document.getElementById('planilha').addEventListener('contextmenu', function(e) {
             e.preventDefault();
             if (gradeBloqueada) return; // TRAVA DE SEGURANÇA
-            
-            if (pincelAtivo) return; // NOVO: Se o pincel estiver ativo, bloqueia o menu para a borracha funcionar
+            if (pincelAtivo) return; 
 
             contextMenuCabecalho.style.display = 'none';
             contextMenuCelula.style.display = 'none';
@@ -1637,6 +1716,16 @@
                 contextMenuCabecalho.style.display = 'block';
                 contextMenuCabecalho.style.left = e.clientX + 'px';
                 contextMenuCabecalho.style.top = e.clientY + 'px';
+
+                // --- CONTROLE INDIVIDUAL DE CONGELAR / DESCONGELAR ---
+                const colEstaCongelada = estadoCongelamento.colIndex !== -1;
+                document.getElementById('btnCongelarCol').style.display = colEstaCongelada ? 'none' : 'block';
+                document.getElementById('btnDescongelarCol').style.display = colEstaCongelada ? 'block' : 'none';
+
+                const rowEstaCongelada = estadoCongelamento.rowIndex !== -1;
+                document.getElementById('btnCongelarRow').style.display = rowEstaCongelada ? 'none' : 'block';
+                document.getElementById('btnDescongelarRow').style.display = rowEstaCongelada ? 'block' : 'none';
+                // --------------------------------------------------
 
                 if (tr.parentElement.tagName === 'THEAD') {
                     targetMenuIndex = e.target.cellIndex;
@@ -1649,6 +1738,7 @@
                 clearSelection();
                 e.target.classList.add('header-highlight');
             } 
+            // CLIQUE NA CÉLULA DE DADOS INTERNA
             else if (e.target.tagName === 'TD') {
                 if (!selectedCells.includes(e.target)) {
                     selecionarUmaCelula(e.target);
@@ -2044,7 +2134,149 @@
             }
             ajustarZoomDinamico();
         }
+        
+		// --- MOTOR DE CONGELAMENTO DE PAINÉIS (ESTILO EXCEL) ---
+        let estadoCongelamento = { ativo: false, colIndex: -1, rowIndex: -1 };
 
+        function atualizarEstilosCongelamento() {
+            let styleEl = document.getElementById('freezeStyles');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'freezeStyles';
+                document.head.appendChild(styleEl);
+            }
+
+            let planilha = document.getElementById('planilha');
+            if (!planilha) return;
+
+            if (!estadoCongelamento.ativo) {
+                styleEl.innerHTML = '';
+                planilha.classList.remove('is-frozen');
+                return;
+            }
+
+            let cabecalho = document.getElementById('cabecalhoColunas');
+            let tbody = document.getElementById('corpoTabela');
+            if (!cabecalho || !tbody || !cabecalho.firstElementChild) return; 
+
+            // O fundo branco impede de ver o texto passando por debaixo das células congeladas
+            let css = `
+                table.is-frozen td { background-color: #ffffff; } 
+                table.is-frozen thead th:nth-child(1) { z-index: 20 !important; }
+            `; 
+
+            const theadTr = cabecalho.firstElementChild;
+            let temCol = estadoCongelamento.colIndex >= 0;
+            let temLin = estadoCongelamento.rowIndex >= 0;
+
+            // 1. PROCESSA COLUNAS
+            if (temCol) {
+                let currentLeft = theadTr.children[0].offsetWidth; 
+                for (let c = 0; c <= estadoCongelamento.colIndex; c++) {
+                    let nth = c + 2; 
+                    css += `
+                        table.is-frozen thead th:nth-child(${nth}), table.is-frozen tbody td:nth-child(${nth}) {
+                            position: sticky !important; left: ${currentLeft}px !important; z-index: 4 !important;
+                        }
+                        table.is-frozen thead th:nth-child(${nth}) { z-index: 12 !important; }
+                    `;
+                    
+                    // Parede Preta: Aplicada com a nova Grelha Falsa (box-shadow)
+                    if (c === estadoCongelamento.colIndex) {
+                        css += `
+                            table.is-frozen.is-scrolled-x tbody td:nth-child(${nth}) {
+                                box-shadow: inset -2px 0 0 0 #000 !important;
+                            }
+                            table.is-frozen.is-scrolled-x thead th:nth-child(${nth}) {
+                                box-shadow: inset -2px 0 0 0 #000, inset 0 0 0 1px #fff !important;
+                            }
+                        `;
+                    }
+                    if (theadTr.children[c + 1]) currentLeft += theadTr.children[c + 1].offsetWidth;
+                }
+            }
+
+            // 2. PROCESSA LINHAS
+            if (temLin) {
+                let currentTop = theadTr.offsetHeight; 
+                for (let r = 0; r <= estadoCongelamento.rowIndex; r++) {
+                    let nth = r + 1;
+                    css += `
+                        table.is-frozen tbody tr:nth-child(${nth}) th, table.is-frozen tbody tr:nth-child(${nth}) td {
+                            position: sticky !important; top: ${currentTop}px !important; z-index: 4 !important;
+                        }
+                        table.is-frozen tbody tr:nth-child(${nth}) th { z-index: 12 !important; }
+                    `;
+
+                    // Parede Preta Inferior
+                    if (r === estadoCongelamento.rowIndex) {
+                        css += `
+                            table.is-frozen.is-scrolled-y tbody tr:nth-child(${nth}) td {
+                                box-shadow: inset 0 -2px 0 0 #000 !important;
+                            }
+                            table.is-frozen.is-scrolled-y tbody tr:nth-child(${nth}) th {
+                                box-shadow: inset 0 -2px 0 0 #000, inset 0 0 0 1px #fff !important;
+                            }
+                        `;
+                    }
+                    if(tbody.children[r]) currentTop += tbody.children[r].offsetHeight;
+                }
+            }
+
+            // 3. A MÁGICA DA INTERSEÇÃO (A quina onde as paredes preta se encontram)
+            if (temCol && temLin) {
+                for (let r = 0; r <= estadoCongelamento.rowIndex; r++) {
+                    let nthRow = r + 1;
+                    for (let c = 0; c <= estadoCongelamento.colIndex; c++) {
+                        let nthCol = c + 2;
+                        css += `table.is-frozen tbody tr:nth-child(${nthRow}) td:nth-child(${nthCol}) { z-index: 8 !important; }`;
+                        
+                        if (r === estadoCongelamento.rowIndex && c === estadoCongelamento.colIndex) {
+                            css += `
+                                table.is-frozen.is-scrolled-x.is-scrolled-y tbody tr:nth-child(${nthRow}) td:nth-child(${nthCol}) {
+                                    box-shadow: inset -2px -2px 0 0 #000 !important;
+                                }
+                            `;
+                        } else if (r === estadoCongelamento.rowIndex) {
+                            css += `table.is-frozen.is-scrolled-x.is-scrolled-y tbody tr:nth-child(${nthRow}) td:nth-child(${nthCol}) { box-shadow: inset 0 -2px 0 0 #000 !important; }`;
+                        } else if (c === estadoCongelamento.colIndex) {
+                            css += `table.is-frozen.is-scrolled-x.is-scrolled-y tbody tr:nth-child(${nthRow}) td:nth-child(${nthCol}) { box-shadow: inset -2px 0 0 0 #000 !important; }`;
+                        }
+                    }
+                }
+            }
+
+            styleEl.innerHTML = css;
+            planilha.classList.add('is-frozen');
+        }
+
+        function acaoCongelar(tipo) {
+            let indiceExato = (tipo === 'col') ? targetMenuIndex - 1 : targetMenuIndex;
+            
+            estadoCongelamento.ativo = true;
+            if (tipo === 'col') estadoCongelamento.colIndex = indiceExato;
+            if (tipo === 'row') estadoCongelamento.rowIndex = indiceExato;
+            
+            atualizarEstilosCongelamento();
+            contextMenuCabecalho.style.display = 'none';
+        }
+
+        // Agora ela recebe 'col' ou 'row' para saber o que desligar
+        function acaoDescongelar(tipo) {
+            if (tipo === 'col') estadoCongelamento.colIndex = -1;
+            if (tipo === 'row') estadoCongelamento.rowIndex = -1;
+
+            // Se os dois estiverem desligados, desativa o congelamento geral
+            if (estadoCongelamento.colIndex === -1 && estadoCongelamento.rowIndex === -1) {
+                estadoCongelamento.ativo = false;
+            }
+
+            atualizarEstilosCongelamento();
+            
+            let menu = document.getElementById('contextMenuCabecalho');
+            if (menu) menu.style.display = 'none';
+        }
+		
         // --- NOVO: MÁQUINA DE ESTADOS PARA LEITURA DE CSV E TSV (PARSER LÉXICO) ---
         // Este algoritmo lê o arquivo perfeitamente, respeitando regras de cada formato
         function parseCSV(text, separator) {
@@ -2213,6 +2445,8 @@
                 gradeBloqueada = false; // DESBLOQUEIA AO ABRIR
                 document.getElementById('welcomeOverlay').style.display = 'none'; // FAZ A JANELA SUMIR
                 
+				acaoDescongelar();
+				
                 inicializarPlanilhaNativa();
                 const tableRows = document.querySelectorAll("#corpoTabela tr");
                 
@@ -2332,15 +2566,15 @@
             if (celulaAtual) celulaAtual.classList.remove('active-focus');
             clearSelection();
             
-            // DESLIGA A MIRA (Remove o destaque das letras e números)
             atualizarMirasVisuais(null); 
             
+            // A mágica de proteger o congelamento e o sticky acontece toda aqui agora:
             toggleExportLayout(true);
+
             try {
-                // NOVO: Adicionado { scale: 3 } para triplicar a resolução da imagem
                 const canvas = await html2canvas(document.getElementById('planilha'), { scale: 3 });
-                
-                toggleExportLayout(false);
+                toggleExportLayout(false); // Restaura tudo
+
                 const defaultName = document.getElementById('appTitle').innerText.replace('SimpleSheet - ', '') + '.png';
                 const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
                 try {
@@ -2355,7 +2589,6 @@
                 } catch (erro) {
                     if (erro.name === 'AbortError') { restabelecerCache(); return; }
                     
-                    // --- NOVO: PLANO B PARA A IMAGEM (FALLBACK COM PERGUNTA DE NOME) ---
                     let nomeSemExtensao = defaultName.replace('.png', '');
                     let nomeEscolhido = prompt("Digite o nome para salvar a imagem:", nomeSemExtensao);
                     
@@ -2365,11 +2598,11 @@
                     }
                     
                     let nomeFinal = nomeEscolhido.trim() + '.png';
-                    
                     const url = URL.createObjectURL(blob); const link = document.createElement('a');
                     link.href = url; link.download = nomeFinal; link.click(); URL.revokeObjectURL(url);
                 }
             } catch (err) { toggleExportLayout(false); alert("Erro ao capturar imagem."); }
+            
             restabelecerCache();
 
             function restabelecerCache() {
@@ -2377,7 +2610,6 @@
                 selectedCells.forEach(c => c.classList.add('selected'));
                 if (celulaAtual) celulaAtual.classList.add('active-focus');
                 
-                // RELIGA A MIRA (Devolve o destaque para a posição original)
                 atualizarMirasVisuais(celulaAtual); 
                 verificarRestricoesInterface(); 
             }
@@ -2389,18 +2621,20 @@
             if (celulaAtual) celulaAtual.classList.remove('active-focus');
             clearSelection();
             
-            // DESLIGA A MIRA (Remove o destaque das letras e números)
             atualizarMirasVisuais(null); 
             
+            // A mágica anti-bug do congelamento acontece internamente
             toggleExportLayout(true);
+
             window.print();
+            
+            // Restaura o congelamento internamente
             toggleExportLayout(false);
             
             selectedCells = cacheSelection;
             selectedCells.forEach(c => c.classList.add('selected'));
             if (celulaAtual) celulaAtual.classList.add('active-focus');
             
-            // RELIGA A MIRA (Devolve o destaque para a posição original)
             atualizarMirasVisuais(celulaAtual); 
             verificarRestricoesInterface();
         }
@@ -2580,6 +2814,9 @@
             thAtivoResize = null;
             document.removeEventListener('mousemove', aoMoverMouseResize);
             document.removeEventListener('mouseup', aoSoltarMouseResize);
+            
+            // NOVO: Refaz a matemática do painel caso ele esteja esticado
+            if (estadoCongelamento.ativo) atualizarEstilosCongelamento(); 
         }
     
 	    // --- NOVO: MOTOR DE BUSCA E SUBSTITUIÇÃO LOTE/INDIVIDUAL ---
