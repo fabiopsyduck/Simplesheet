@@ -796,9 +796,9 @@
         let autoScrollY = 0;
         let ultimoMouseX = 0;
         let ultimoMouseY = 0;
-        const ZONA_GATILHO_SCROLL = 40; 
-        const VELOCIDADE_SCROLL = 15;
-		
+        const ZONA_GATILHO_SCROLL = 50;
+		const ZONA_GATILHO_SCROLL_SUAVE = 63; // 50 (zona média) + 13 (1/4 da antiga área suave)
+        		
         function getRowCol(td) {
             return {
                 r: td.parentElement.rowIndex - 1,
@@ -913,30 +913,75 @@
             let minC = Math.min(c1, c2);
             let maxC = Math.max(c1, c2);
 
-            if (!append) clearSelection();
+            if (append) {
+                // Modo Legado para uso avançado (Ctrl + Clique)
+                clearSelection();
+                for (let r = minR; r <= maxR; r++) {
+                    let tr = tbody.children[r];
+                    if (!tr) continue;
+                    for (let c = minC; c <= maxC; c++) {
+                        let td = tr.children[c + 1];
+                        if (!td) continue;
+                        if (!td.classList.contains('selected')) td.classList.add('selected');
+                        if (!selectedCells.includes(td)) selectedCells.push(td);
+                        
+                        if (minR !== maxR || minC !== maxC) {
+                            if (r === minR) td.classList.add('sel-top');
+                            if (r === maxR) td.classList.add('sel-bottom');
+                            if (c === minC) td.classList.add('sel-left');
+                            if (c === maxC) td.classList.add('sel-right');
+                        }
+                    }
+                }
+            } else {
+                // MODO TURBO (DIFFING): Reduz engasgos de mouse e scroll em 99%
+                let novoSet = new Set();
+                let perimTop = []; let perimBottom = []; let perimLeft = []; let perimRight = [];
 
-            for (let r = minR; r <= maxR; r++) {
-                let tr = tbody.children[r];
-                for (let c = minC; c <= maxC; c++) {
-                    let td = tr.children[c + 1];
-                    
+                // 1. Mapeia quem deveria estar pintado
+                for (let r = minR; r <= maxR; r++) {
+                    let tr = tbody.children[r];
+                    if (!tr) continue;
+                    for (let c = minC; c <= maxC; c++) {
+                        let td = tr.children[c + 1];
+                        if (!td) continue;
+                        novoSet.add(td);
+                        
+                        if (minR !== maxR || minC !== maxC) {
+                            if (r === minR) perimTop.push(td);
+                            if (r === maxR) perimBottom.push(td);
+                            if (c === minC) perimLeft.push(td);
+                            if (c === maxC) perimRight.push(td);
+                        }
+                    }
+                }
+
+                // 2. Apaga SÓ quem saiu do quadrado e limpa as bordas velhas
+                for (let i = 0; i < selectedCells.length; i++) {
+                    let td = selectedCells[i];
+                    td.classList.remove('sel-top', 'sel-bottom', 'sel-left', 'sel-right');
+                    if (!novoSet.has(td)) {
+                        td.classList.remove('selected');
+                    }
+                }
+
+                // 3. Pinta de azul SÓ as células que acabaram de entrar no quadrado
+                novoSet.forEach(td => {
                     if (!td.classList.contains('selected')) {
                         td.classList.add('selected');
                     }
-                    if (!selectedCells.includes(td)) {
-                        selectedCells.push(td);
-                    }
-                    
-                    // --- NOVO: LÓGICA DE BORDAS INTELIGENTES DO PERÍMETRO ---
-                    // Se estivermos desenhando um retângulo maior que uma única célula
-                    if (minR !== maxR || minC !== maxC) {
-                        if (r === minR) td.classList.add('sel-top');
-                        if (r === maxR) td.classList.add('sel-bottom');
-                        if (c === minC) td.classList.add('sel-left');
-                        if (c === maxC) td.classList.add('sel-right');
-                    }
-                }
+                });
+
+                // 4. Refaz o perímetro
+                perimTop.forEach(td => td.classList.add('sel-top'));
+                perimBottom.forEach(td => td.classList.add('sel-bottom'));
+                perimLeft.forEach(td => td.classList.add('sel-left'));
+                perimRight.forEach(td => td.classList.add('sel-right'));
+
+                // 5. Atualiza o array oficial de seleção de forma instantânea
+                selectedCells = Array.from(novoSet);
             }
+
             if (celulaAtual) celulaAtual.classList.add('active-focus');
             verificarRestricoesInterface();
         }
@@ -958,17 +1003,11 @@
             let expectedCount = (maxR - minR + 1) * (maxC - minC + 1);
             if (selectedCells.length !== expectedCount) return false;
 
-            const tbody = document.getElementById('corpoTabela');
-            for (let r = minR; r <= maxR; r++) {
-                let tr = tbody.children[r];
-                for (let c = minC; c <= maxC; c++) {
-                    let td = tr.children[c + 1];
-                    if (!selectedCells.includes(td)) return false;
-                }
-            }
-            return true;
+            // NOVO MODO TURBO: Matemática pura. Se a área tem o tamanho exato e não há duplicatas,
+            // é fisicamente garantido que é um retângulo perfeito. Escaneia a tabela em milissegundos.
+            let uniqueCount = new Set(selectedCells).size;
+            return uniqueCount === expectedCount;
         }
-
         function apagarConteudoSelecao() {
             contextMenuCelula.style.display = 'none';
             selectedCells.forEach(td => { 
@@ -1194,6 +1233,7 @@
             document.getElementById('btnConfig').disabled = travado;
             document.getElementById('btnAddCol').disabled = travado;
             document.getElementById('btnAddLinha').disabled = travado;
+            document.getElementById('btnBuscar').disabled = travado; // <--- NOVO: Botão Localizar bloqueado
             
             // --- NOVO: TRAVA DOS BOTÕES DA PALETA E PINCEL ---
             document.getElementById('btnPaleta').disabled = travado;
@@ -1793,15 +1833,27 @@
 		// --- INÍCIO DO MOTOR DE AUTO-SCROLL ---
         function loopAutoScroll() {
             if (autoScrollX !== 0 || autoScrollY !== 0) {
+                const container = document.getElementById('gridContainer');
+                
                 // Rola a div da sua planilha
-                document.getElementById('gridContainer').scrollBy(autoScrollX, autoScrollY);
+                container.scrollBy(autoScrollX, autoScrollY);
 
-                // O EFEITO ESTEIRA AGORA RECONHECE SELEÇÃO OU PINCEL:
-                let elementoSobMouse = document.elementFromPoint(ultimoMouseX, ultimoMouseY);
+                // --- NOVO: LIMITADOR (CLAMPING) DO MOUSE ---
+                // Pegamos as fronteiras reais da área da planilha
+                const rect = container.getBoundingClientRect();
+                
+                // Forçamos a coordenada de leitura a ficar SEMPRE dentro da zona útil de células.
+                // +50 e +30 garantem que o raio laser passe por cima das barras cinzas de Letras e Números.
+                // -25 garante que o raio laser não bata nas barras de rolagem verticais/horizontais.
+                let miraX = Math.max(rect.left + 50, Math.min(ultimoMouseX, rect.right - 25));
+                let miraY = Math.max(rect.top + 30, Math.min(ultimoMouseY, rect.bottom - 25));
+
+                // O EFEITO ESTEIRA AGORA LÊ A "MIRA" CALCULADA E NÃO MAIS O MOUSE REAL:
+                let elementoSobMouse = document.elementFromPoint(miraX, miraY);
+                
                 if (elementoSobMouse && elementoSobMouse.tagName === 'TD') {
-                    
                     if (isDragging) {
-                        // Se estiver selecionando
+                        // Se estiver selecionando, usa o modo Turbo do Diffing
                         let pos = getRowCol(elementoSobMouse);
                         selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, false);
                         atualizarMirasVisuais(elementoSobMouse);
@@ -1809,7 +1861,6 @@
                         // Se estiver pintando com o Pincel
                         aplicarPintura(elementoSobMouse, dragPincelApagando);
                     }
-                    
                 }
                 scrollFrame = requestAnimationFrame(loopAutoScroll);
             } else {
@@ -1827,24 +1878,46 @@
             ultimoMouseX = e.clientX;
             ultimoMouseY = e.clientY;
             
-            // CORREÇÃO AQUI: Agora o motor liga se estiver arrastando a seleção OU o pincel
             if (!isDragging && !isDraggingPincel) return; 
 
             autoScrollX = 0; autoScrollY = 0;
             const container = document.getElementById('gridContainer');
             const rect = container.getBoundingClientRect();
 
-            // Detecta colisão do mouse com as bordas da sua div 'gridContainer'
-            if (ultimoMouseX < rect.left + ZONA_GATILHO_SCROLL) autoScrollX = -VELOCIDADE_SCROLL;
-            else if (ultimoMouseX > rect.right - ZONA_GATILHO_SCROLL) autoScrollX = VELOCIDADE_SCROLL;
+            // Sensor de "Tilt Máximo" (Vazou da tabela)
+            let mouseForaDaTabela = (
+                ultimoMouseX < rect.left || 
+                ultimoMouseX > rect.right || 
+                ultimoMouseY < rect.top || 
+                ultimoMouseY > rect.bottom
+            );
 
-            if (ultimoMouseY < rect.top + ZONA_GATILHO_SCROLL) autoScrollY = -VELOCIDADE_SCROLL;
-            else if (ultimoMouseY > rect.bottom - ZONA_GATILHO_SCROLL) autoScrollY = VELOCIDADE_SCROLL;
+            // EIXO X (Esquerda / Direita)
+            if (ultimoMouseX < rect.left + ZONA_GATILHO_SCROLL) {
+                autoScrollX = mouseForaDaTabela ? -32 : -16; // Médio ou Máximo
+            } else if (ultimoMouseX < rect.left + ZONA_GATILHO_SCROLL_SUAVE) {
+                autoScrollX = -8; // Tilt Leve (Metade da velocidade)
+            } else if (ultimoMouseX > rect.right - ZONA_GATILHO_SCROLL) {
+                autoScrollX = mouseForaDaTabela ? 32 : 16;   // Médio ou Máximo
+            } else if (ultimoMouseX > rect.right - ZONA_GATILHO_SCROLL_SUAVE) {
+                autoScrollX = 8;  // Tilt Leve (Metade da velocidade)
+            }
 
+            // EIXO Y (Cima / Baixo)
+            if (ultimoMouseY < rect.top + ZONA_GATILHO_SCROLL) {
+                autoScrollY = mouseForaDaTabela ? -8 : -4;   // Médio ou Máximo
+            } else if (ultimoMouseY < rect.top + ZONA_GATILHO_SCROLL_SUAVE) {
+                autoScrollY = -2; // Tilt Leve (Metade da velocidade)
+            } else if (ultimoMouseY > rect.bottom - ZONA_GATILHO_SCROLL) {
+                autoScrollY = mouseForaDaTabela ? 8 : 4;     // Médio ou Máximo
+            } else if (ultimoMouseY > rect.bottom - ZONA_GATILHO_SCROLL_SUAVE) {
+                autoScrollY = 2;  // Tilt Leve (Metade da velocidade)
+            }
+
+            // Liga ou desliga o motor do Loop
             if ((autoScrollX !== 0 || autoScrollY !== 0) && !scrollFrame) loopAutoScroll();
             else if (autoScrollX === 0 && autoScrollY === 0 && scrollFrame) pararAutoScroll();
         });
-        // --- FIM DO MOTOR DE AUTO-SCROLL ---
 		
         // --- SISTEMA DE GESTÃO DO MOUSE ---
         const tabela = document.getElementById('planilha');
