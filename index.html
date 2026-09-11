@@ -210,7 +210,25 @@
             min-width: 120px; 
             z-index: 10000;
         }
-        .menu-item.has-submenu:hover .submenu-flutuante { display: block; }
+        .menu-item.has-submenu:hover > .submenu-flutuante { display: block; }
+		
+		/* --- SETAS INTELIGENTES DOS SUBMENUS --- */
+        .seta-esq { display: none; }
+        .seta-dir { display: inline; }
+        .menu-invertido-x .seta-esq { display: inline; }
+        .menu-invertido-x .seta-dir { display: none; }
+		
+		/* Proteção Anti-Corte: Faz o submenu abrir para a esquerda */
+        .menu-invertido-x .submenu-flutuante {
+            left: auto !important; 
+            right: 100% !important;
+        }
+
+        /* Proteção Anti-Corte: Faz o submenu abrir para cima */
+        .menu-invertido-y .submenu-flutuante {
+            top: auto !important;
+            bottom: -2px !important;
+        }
 		
         /* --- PLANILHA E CÉLULAS --- */
         .grid-container { flex: 1; background-color: #808080; overflow: auto; position: relative; }
@@ -358,18 +376,38 @@
         .custom-select-item:hover { background: #000080; color: white; }
 		
         @media print {
+            /* 1. Define margens limpas (Orientação padrão do sistema) */
+            @page { margin: 10mm; }
+
             body, .grid-container { height: auto; background-color: white; overflow: visible; }
             .title-bar, .toolbar, .context-menu, .modal-overlay { display: none !important; }
             
-            /* CORREÇÃO: Alterado de 100% para auto para manter o aproveitamento justo no papel */
-            table { width: auto !important; table-layout: auto !important; } 
+            /* 2. Força a tabela a espremer seu conteúdo no limite máximo do papel */
+            table { 
+                width: 100% !important; 
+                max-width: 100% !important;
+                table-layout: auto !important; 
+                border-collapse: collapse !important; /* A CURA: Funde as bordas duplas em uma única linha fina */
+            } 
+            
+            /* 3. Proteção contra "Guilhotina": não corta uma linha pela metade entre duas folhas */
+            tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
             
             th, td { 
-                border: 1px solid black !important; 
+                border: 0.5pt solid black !important; /* A CURA: Traço físico extrafino no papel em vez de pixel de tela */
                 outline: none !important; 
-                -webkit-print-color-adjust: exact !important; /* Força Chrome e Edge a imprimirem a cor do fundo */
-                print-color-adjust: exact !important;         /* Força o Firefox a imprimir a cor do fundo */
-                position: static !important;                  /* NOVO: Desliga a ancoragem no papel para evitar bugs */
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+                position: static !important;
+                
+                /* 4. Destrava o limite de 80px, mas MANTÉM o texto em 1 linha (sem pular) */
+                min-width: 0 !important; 
+                white-space: nowrap !important; 
+                overflow: hidden !important;    
+                font-size: 10px !important;     
             }
             th { background-color: #e0e0e0 !important; }
             td.selected, td.mass-selected { outline: none; background-color: white; }
@@ -543,13 +581,13 @@
                     </div>
 
                     <div class="config-option" title="Analisa a planilha e esconde as áreas vazias automáticas, exportando apenas o seu conteúdo.">
-                        <input type="checkbox" id="chkRecorteInteligente">
+                        <input type="checkbox" id="chkRecorteInteligente" checked> <!-- MUDANÇA: 'checked' adicionado -->
                         <label for="chkRecorteInteligente">Limpar amostragem extra (Recorte)</label>
                     </div>
                     
                     <div class="config-option" style="margin-left: 20px;" title="Define quantas linhas e colunas extras (vazias) serão mantidas como respiro ao redor dos dados cortados. Mínimo 0, Máximo 20.">
                         <label for="numFolgaRecorte">Margem de folga:</label>
-                        <input type="number" id="numFolgaRecorte" class="input-number-win98" min="0" max="20" value="1">
+                        <input type="number" id="numFolgaRecorte" class="input-number-win98" min="0" max="20" value="0"> <!-- MUDANÇA: value alterado para 0 -->
                     </div>
                 </fieldset>
                 <div class="window-footer">
@@ -602,38 +640,36 @@
         </div>
     </div>
 	
-    <!-- NOVO: JANELA DE LOCALIZAR E SUBSTITUIR (WIN98) -->
-    <div id="buscaModal" class="modal-overlay" style="display: none; align-items: flex-start; padding-top: 80px;">
-        <div class="window-dialog" style="width: 360px;">
-            <div class="dialog-title">
-                <span>Localizar e Substituir</span>
-                <div class="close-x" title="Fechar aba" onclick="fecharBuscaModal()">X</div>
+    <!-- NOVO: JANELA FLUTUANTE DE LOCALIZAR E SUBSTITUIR (WIN98) -->
+    <div id="buscaModal" class="window-dialog" style="display: none; position: fixed; width: 360px; z-index: 3000; box-shadow: 4px 4px 15px rgba(0,0,0,0.6);">
+        <div class="dialog-title" id="buscaModalHeader" style="cursor: move;">
+            <span>Localizar e Substituir</span>
+            <div class="close-x" title="Fechar aba" onclick="fecharBuscaModal()" style="cursor: pointer;">X</div>
+        </div>
+        <div class="window-body">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                <label style="width: 90px;">Localizar:</label>
+                <input type="text" id="inputLocalizar" style="flex: 1; border: 2px inset #dfdfdf; padding: 3px; font-family: 'MS Sans Serif', sans-serif;">
             </div>
-            <div class="window-body">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
-                    <label style="width: 90px;">Localizar:</label>
-                    <input type="text" id="inputLocalizar" style="flex: 1; border: 2px inset #dfdfdf; padding: 3px; font-family: 'MS Sans Serif', sans-serif;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
+                <label style="width: 90px;">Substituir:</label>
+                <input type="text" id="inputSubstituir" style="flex: 1; border: 2px inset #dfdfdf; padding: 3px; font-family: 'MS Sans Serif', sans-serif;">
+            </div>
+            <fieldset class="config-group" style="padding: 6px 10px; margin-bottom: 12px;">
+                <legend>Opções</legend>
+                <div class="config-option" style="margin-bottom: 0;">
+                    <input type="checkbox" id="chkMaiusculas">
+                    <label for="chkMaiusculas">Diferenciar maiúsculas e minúsculas</label>
                 </div>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">
-                    <label style="width: 90px;">Substituir:</label>
-                    <input type="text" id="inputSubstituir" style="flex: 1; border: 2px inset #dfdfdf; padding: 3px; font-family: 'MS Sans Serif', sans-serif;">
+            </fieldset>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <button class="btn" style="width: 48%; justify-content: center; font-weight: bold;" onclick="acaoLocalizarProximo()">Procurar Próxima</button>
+                    <button class="btn" style="width: 48%; justify-content: center;" onclick="acaoSubstituirAtual()">Substituir Atual</button>
                 </div>
-                <fieldset class="config-group" style="padding: 6px 10px; margin-bottom: 12px;">
-                    <legend>Opções</legend>
-                    <div class="config-option" style="margin-bottom: 0;">
-                        <input type="checkbox" id="chkMaiusculas">
-                        <label for="chkMaiusculas">Diferenciar maiúsculas e minúsculas</label>
-                    </div>
-                </fieldset>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <button class="btn" style="width: 48%; justify-content: center; font-weight: bold;" onclick="acaoLocalizarProximo()">Procurar Próxima</button>
-                        <button class="btn" style="width: 48%; justify-content: center;" onclick="acaoSubstituirAtual()">Substituir Atual</button>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <button class="btn" style="width: 48%; justify-content: center;" onclick="acaoSubstituirTudo()">Substituir Tudo</button>
-                        <button class="btn" style="width: 48%; justify-content: center;" onclick="fecharBuscaModal()">Cancelar</button>
-                    </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <button class="btn" style="width: 48%; justify-content: center;" onclick="acaoSubstituirTudo()">Substituir Tudo</button>
+                    <button class="btn" style="width: 48%; justify-content: center;" onclick="fecharBuscaModal()">Cancelar</button>
                 </div>
             </div>
         </div>
@@ -715,7 +751,7 @@
         <div class="menu-item" onmousedown="event.preventDefault()" onclick="copiarPosicoes()">📍 Copiar Coordenadas para Cálculo</div>
         
         <div class="menu-item has-submenu">
-            🧮 Transformar em Cálculo ►
+            <span class="seta-esq">◄ </span>🧮 Transformar em Cálculo<span class="seta-dir"> ►</span>
             <div class="submenu-flutuante">
                 <!-- Opções Rápidas -->
                 <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarFormulaRapida('+')">Somar (+)</div>
@@ -727,7 +763,7 @@
                 
                 <!-- NOVO: Porcentagem com Submenu em cascata -->
                 <div class="menu-item has-submenu">
-                    Porcentagem (%) ►
+                    <span class="seta-esq">◄ </span>Porcentagem (%)<span class="seta-dir"> ►</span>
                     <div class="submenu-flutuante">
                         <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarPorcentagem('EXTRAIR')">Extrair Valor (Parte do Todo)</div>
                         <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarPorcentagem('ACRESCIMO')">Adicionar Acréscimo (+)</div>
@@ -1011,11 +1047,12 @@
         function apagarConteudoSelecao() {
             contextMenuCelula.style.display = 'none';
             selectedCells.forEach(td => { 
-                td.dataset.raw = ''; // <--- NOVO
+                td.dataset.raw = ''; // Apaga o estoque
                 td.innerText = ''; 
                 td.style.backgroundColor = ''; 
                 td.style.color = '';           
             });
+            atualizarTodasAsFormulas(); // <--- BLINDAGEM: Força o motor matemático a ver que sumiu!
             salvarEstado();
         }
 
@@ -1404,8 +1441,14 @@
 
             if (snap.selR >= 0 && snap.selR < totalLinhas && snap.selC >= 0 && snap.selC < totalColunas) {
                 selecionarUmaCelula(tbody.children[snap.selR].children[snap.selC + 1]);
+            } else if (currentRow >= 0 && currentCol >= 0) {
+                // LOOPHOLE FECHADO: Garante que a câmera nunca aponte pro vazio se a tabela encolher no Ctrl+Z
+                let linhaSegura = Math.min(currentRow, totalLinhas - 1);
+                let colunaSegura = Math.min(currentCol, totalColunas - 1);
+                selecionarUmaCelula(tbody.children[linhaSegura].children[colunaSegura + 1]);
             } else {
-                celulaAtual = null; clearSelection(); atualizarMirasVisuais(null);
+                // Célula de segurança A1 caso tudo dê errado
+                selecionarUmaCelula(tbody.children[0].children[1]); 
             }
             atualizarEstadoBotoes();
         }
@@ -1484,21 +1527,33 @@
                 if (acao === 'limpar') {
                     for (let i = 0; i < tbody.children.length; i++) {
                         let celula = tbody.children[i].children[targetMenuIndex];
+                        celula.dataset.raw = ''; // <--- BLINDAGEM: Apaga o estoque
                         celula.innerText = '';
-                        celula.style.backgroundColor = ''; // Limpa o fundo
-                        celula.style.color = '';           // Limpa a letra
+                        celula.style.backgroundColor = ''; 
+                        celula.style.color = '';           
                     }
+                    atualizarTodasAsFormulas(); // <--- BLINDAGEM: Atualiza cálculos dependentes
                 } 
                 else if (acao === 'apagar') {
                     if (totalColunas <= 1) return alert("Não é possível apagar a última coluna.");
                     theadTr.deleteCell(targetMenuIndex);
                     for (let i = 0; i < tbody.children.length; i++) tbody.children[i].deleteCell(targetMenuIndex);
-                    totalColunas--; recalcularNumerosELetras(); ajustarZoomDinamico();
+                    totalColunas--; 
+                    
+                    // BLINDAGEM: Se a seleção ativa sumiu com a coluna, puxa ela para a esquerda
+                    if (currentCol >= totalColunas) currentCol = totalColunas - 1;
+                    if (celulaAtual) selecionarUmaCelula(tbody.children[currentRow].children[currentCol + 1]);
+                    
+                    recalcularNumerosELetras(); ajustarZoomDinamico();
                 } 
                 else if (acao === 'inserirEsq' || acao === 'inserirDir') {
                     const insertIdx = (acao === 'inserirEsq') ? targetMenuIndex : targetMenuIndex + 1;
                     const th = document.createElement('th'); theadTr.insertBefore(th, theadTr.children[insertIdx]);
-                    for (let i = 0; i < tbody.children.length; i++) tbody.children[i].insertBefore(document.createElement('td'), tbody.children[i].children[insertIdx]);
+                    for (let i = 0; i < tbody.children.length; i++) {
+                        let novoTd = document.createElement('td'); // Cria a célula
+                        novoTd.dataset.raw = ''; // <--- BLINDAGEM: Garante o estoque vazio
+                        tbody.children[i].insertBefore(novoTd, tbody.children[i].children[insertIdx]);
+                    }
                     totalColunas++; recalcularNumerosELetras(); ajustarZoomDinamico();
                 }
             } 
@@ -1506,21 +1561,33 @@
                 if (acao === 'limpar') {
                     const tds = tbody.children[targetMenuIndex].querySelectorAll('td');
                     tds.forEach(td => {
+                        td.dataset.raw = ''; // <--- BLINDAGEM: Apaga o estoque
                         td.innerText = '';
-                        td.style.backgroundColor = ''; // Limpa o fundo
-                        td.style.color = '';           // Limpa a letra
+                        td.style.backgroundColor = ''; 
+                        td.style.color = '';           
                     });
+                    atualizarTodasAsFormulas(); // <--- BLINDAGEM: Atualiza cálculos dependentes
                 } 
                 else if (acao === 'apagar') {
                     if (totalLinhas <= 1) return alert("Não é possível apagar a última linha.");
                     tbody.deleteRow(targetMenuIndex);
-                    totalLinhas--; recalcularNumerosELetras();
+                    totalLinhas--; 
+                    
+                    // BLINDAGEM: Se a seleção ativa sumiu com a linha, puxa ela para cima
+                    if (currentRow >= totalLinhas) currentRow = totalLinhas - 1;
+                    if (celulaAtual) selecionarUmaCelula(tbody.children[currentRow].children[currentCol + 1]);
+
+                    recalcularNumerosELetras();
                 } 
                 else if (acao === 'inserirAcima' || acao === 'inserirAbaixo') {
                     const insertIdx = (acao === 'inserirAcima') ? targetMenuIndex : targetMenuIndex + 1;
                     const tr = tbody.insertRow(insertIdx);
                     const thRow = document.createElement('th'); thRow.style.width = '30px'; tr.appendChild(thRow);
-                    for (let c = 0; c < totalColunas; c++) tr.appendChild(document.createElement('td'));
+                    for (let c = 0; c < totalColunas; c++) {
+                        let novoTd = document.createElement('td'); // Cria a célula
+                        novoTd.dataset.raw = ''; // <--- BLINDAGEM: Garante o estoque vazio
+                        tr.appendChild(novoTd);
+                    }
                     totalLinhas++; recalcularNumerosELetras();
                 }
             }
@@ -1551,7 +1618,10 @@
                         while (inicioCol + j >= totalColunas) adicionarUltimaColuna(false);
                         const tr = tbody.children[inicioRow + i];
                         const td = tr.children[inicioCol + j + 1]; 
-                        td.innerText = colunas[j];
+                        
+                        td.dataset.raw = colunas[j]; // <--- A CURA: Grava no "estoque" profundo
+                        td.innerText = colunas[j];   // Atualiza a "vitrine" visual
+                        
                         // Limpa a cor para receber texto puro limpo
                         td.style.backgroundColor = '';
                         td.style.color = '';
@@ -1563,6 +1633,7 @@
                     selectRectangle(inicioRow, inicioCol, inicioRow + linhas.length - 1, inicioCol + maxCols - 1, false);
                 }
 
+                atualizarTodasAsFormulas(); // <--- BÔNUS: Se colar fórmula matemática, já calcula!
                 salvarEstado(); 
             }
         }
@@ -1611,7 +1682,10 @@
                     const tr = tbody.children[inicioRow + i];
                     const td = tr.children[inicioCol + j + 1]; 
                     
-                    td.innerText = colunas[j].innerText || '';
+                    let textoExtraido = colunas[j].innerText || '';
+                    td.dataset.raw = textoExtraido; // <--- A CURA: Grava no "estoque"
+                    td.innerText = textoExtraido;   // Atualiza a "vitrine"
+                    
                     td.style.backgroundColor = colunas[j].style.backgroundColor || '';
                     td.style.color = colunas[j].style.color || '';
                 }
@@ -1622,12 +1696,18 @@
                 selectRectangle(inicioRow, inicioCol, inicioRow + maxRows, inicioCol + maxCols - 1, false);
             }
 
+            atualizarTodasAsFormulas(); // <--- BÔNUS
             salvarEstado();
         }
 
         // NOVO: Escuta o evento Ctrl+V separando texto de HTML
         document.addEventListener('paste', function(e) {
-            e.preventDefault();
+            // BLINDAGEM: Se o cursor estiver dentro de uma caixa de texto da interface, permite colar normalmente nela
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+                return; // Cancela o roubo da colagem e deixa a caixa do "Localizar" funcionar
+            }
+
+            e.preventDefault(); // Bloqueia o navegador de colar por cima da página
             let clipboardData = e.clipboardData || window.clipboardData;
             let htmlData = clipboardData.getData('text/html');
             let textData = clipboardData.getData('text/plain');
@@ -1742,10 +1822,13 @@
 
             await acaoCopiar();
             selectedCells.forEach(td => { 
+                td.dataset.raw = ""; // <--- A CURA: Apaga o "estoque" da memória profunda
                 td.innerText = ""; 
-                td.style.backgroundColor = ''; // NOVO: Remove a cor ao Recortar
-                td.style.color = '';           // NOVO: Remove a cor ao Recortar
+                td.style.backgroundColor = ''; 
+                td.style.color = '';           
             });
+            
+            atualizarTodasAsFormulas(); // BÔNUS: Atualiza a matemática (se alguma conta dependia do que foi recortado, ela zera)
             salvarEstado();
         }
 
@@ -1756,6 +1839,60 @@
         const contextMenuCelula = document.getElementById('contextMenuCelula');
         const menuCol = document.getElementById('menuCol');
         const menuRow = document.getElementById('menuRow');
+		
+		// --- NOVO: CÉREBRO DE POSICIONAMENTO INTELIGENTE DOS MENUS ---
+        function posicionarMenuInteligente(menu, mouseX, mouseY, alvo) {
+            menu.style.display = 'block'; // Mostra o menu para o navegador medir
+            
+            const rect = menu.getBoundingClientRect();
+            let posX = mouseX;
+            let posY = mouseY;
+
+            const limiteX = window.innerWidth;
+            const limiteY = window.innerHeight;
+
+            // NOVA BLINDAGEM VISUAL: Tentar não cobrir a célula ativada
+            if (alvo && (alvo.tagName === 'TD' || alvo.tagName === 'TH')) {
+                const alvoRect = alvo.getBoundingClientRect();
+                
+                // Opção A: Tenta abrir o menu perfeitamente alinhado logo ABAIXO da célula
+                posY = alvoRect.bottom + 2; // 2 pixels de respiro da borda
+                posX = mouseX + 2; // Leve desvio pra direita pra não ficar debaixo do ponteiro
+                
+                // Opção B: Se abrir abaixo for bater no chão da tela, inverte para abrir ACIMA da célula
+                if (posY + rect.height > limiteY) {
+                    posY = alvoRect.top - rect.height - 2;
+                }
+            }
+
+            // BLINDAGEM HORIZONTAL DO MENU PRINCIPAL
+            if (posX + rect.width > limiteX) {
+                posX = limiteX - rect.width - 5;
+            }
+            
+            // BLINDAGEM VERTICAL DE EMERGÊNCIA
+            if (posY + rect.height > limiteY) {
+                posY = limiteY - rect.height - 5;
+            }
+            if (posY < 0) posY = 5;
+
+            menu.style.left = posX + 'px';
+            menu.style.top = posY + 'px';
+
+            // INTELIGÊNCIA DOS SUBMENUS (Eixo X - Direita/Esquerda)
+            if (posX + rect.width + 220 > limiteX) { 
+                menu.classList.add('menu-invertido-x');
+            } else {
+                menu.classList.remove('menu-invertido-x');
+            }
+
+            // INTELIGÊNCIA DOS SUBMENUS (Eixo Y - Cima/Baixo)
+            if (mouseY > limiteY - 250) { 
+                menu.classList.add('menu-invertido-y');
+            } else {
+                menu.classList.remove('menu-invertido-y');
+            }
+        }
 
         document.getElementById('planilha').addEventListener('contextmenu', function(e) {
             e.preventDefault();
@@ -1767,9 +1904,8 @@
 
             if (e.target.tagName === 'TH' && !e.target.classList.contains('corner')) {
                 const tr = e.target.parentElement;
-                contextMenuCabecalho.style.display = 'block';
-                contextMenuCabecalho.style.left = e.clientX + 'px';
-                contextMenuCabecalho.style.top = e.clientY + 'px';
+                
+                posicionarMenuInteligente(contextMenuCabecalho, e.clientX, e.clientY, e.target);
 
                 // --- CONTROLE INDIVIDUAL DE CONGELAR / DESCONGELAR ---
                 const colEstaCongelada = estadoCongelamento.colIndex !== -1;
@@ -1813,9 +1949,7 @@
                     mColar.classList.add('disabled');
                 }
 
-                contextMenuCelula.style.display = 'block';
-                contextMenuCelula.style.left = e.clientX + 'px';
-                contextMenuCelula.style.top = e.clientY + 'px';
+                posicionarMenuInteligente(contextMenuCelula, e.clientX, e.clientY, e.target);
             }
         });
 
@@ -1929,10 +2063,9 @@
                 // --- NOVO: LÓGICA DO PINCEL ---
                 if (pincelAtivo) {
                     isDraggingPincel = true;
-                    // Se apertar o botão direito (código 2), ele ativa o modo borracha
                     dragPincelApagando = (e.button === 2); 
                     aplicarPintura(e.target, dragPincelApagando);
-                    return; // Aborta a seleção normal para não misturar as coisas
+                    return; 
                 }
 
                 // --- LÓGICA NORMAL DE SELEÇÃO DA PLANILHA ---
@@ -1963,6 +2096,9 @@
                     selecionarUmaCelula(e.target);
                 }
                 atualizarMirasVisuais(e.target);
+                
+                // NOVO: Tira a foto APÓS a seleção estar na nova célula correta
+                if (salvaHistoricoNoClique) salvarEstado();
             }
         });
 
@@ -2066,7 +2202,6 @@
                 }
                 if (e.key === 'Escape') { celulaAtual.innerText = valorPreEdicao; sairModoEdicao(true); } 
                 
-                // --- ATALHO NOVO: Pular com TAB enquanto edita ---
                 if (e.key === 'Tab') {
                     e.preventDefault();
                     sairModoEdicao();
@@ -2121,7 +2256,9 @@
                 case 'Backspace': case 'Delete': apagarConteudoSelecao(); break;
                 default:
                     if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                        celulaAtual.innerText = ''; entrarModoEdicao(celulaAtual);
+                        celulaAtual.dataset.raw = ''; // <--- BLINDAGEM: Zera o estoque antes de reescrever
+                        celulaAtual.innerText = ''; 
+                        entrarModoEdicao(celulaAtual);
                     }
                     break;
             }
@@ -2156,11 +2293,10 @@
                 let mudou = celulaAtual.innerText !== valorPreEdicao;
                 
                 if (!foiCancelado && mudou) {
-                    celulaAtual.dataset.raw = celulaAtual.innerText; // Guarda a fórmula digitada no fundo
-                    atualizarTodasAsFormulas(); // Calcula ela e todas as outras dependentes na tela
+                    celulaAtual.dataset.raw = celulaAtual.innerText; 
+                    atualizarTodasAsFormulas(); 
                     salvarEstado();
                 } else {
-                    // Se cancelou (ESC) ou apertou Enter sem alterar nada, restaura a exibição visual do resultado
                     atualizarTodasAsFormulas();
                 }
             }
@@ -2588,10 +2724,21 @@
                 for (let j = 0; j <= maxColuna; j++) {
                     let textoPuro = celulas[j].dataset.raw !== undefined ? celulas[j].dataset.raw : celulas[j].innerText;
                     
+                    // SEGURANÇA: Garante que o valor é lido como texto para não falhar no .includes()
+                    textoPuro = String(textoPuro);
+                    
                     if (formatoAtual === 'csv' || formatoAtual === 'csv_global') {
-                        let textoEscapado = textoPuro.replace(/"/g, '""');
-                        linea.push('"' + textoEscapado + '"');
+                        // --- O MOTOR INTELIGENTE (RFC 4180 COMPLIANT) ---
+                        // Só envelopa com aspas se encontrar os caracteres perigosos que quebram o arquivo.
+                        if (textoPuro.includes(separador) || textoPuro.includes('\n') || textoPuro.includes('\r') || textoPuro.includes('"')) {
+                            let textoEscapado = textoPuro.replace(/"/g, '""');
+                            linea.push('"' + textoEscapado + '"');
+                        } else {
+                            // Se o texto é limpo, salva limpo!
+                            linea.push(textoPuro);
+                        }
                     } else {
+                        // Formatos TSV e PIPE continuam no modo bruto seguro (eles esmagam quebras de linha em vez de envelopar)
                         let textoLimpo = textoPuro.replace(/(\r\n|\n|\r)/gm, " ");
                         if (separador === '\t') textoLimpo = textoLimpo.replace(/\t/g, " ");
                         if (separador === '|') textoLimpo = textoLimpo.replace(/\|/g, " ");
@@ -2624,20 +2771,13 @@
                     return; 
                 } else { throw new Error(); }
             } catch (erro) {
-                // Se o erro foi porque o usuário clicou em "Cancelar" na janela do Windows, apenas interrompe.
                 if (erro.name === 'AbortError') return;
                 
-                // --- NOVO: PLANO B (FALLBACK COM PERGUNTA DE NOME) ---
-                // Retira a extensão (.csv) para não confundir o usuário na hora de digitar
                 let nomeSemExtensao = nomeArquivoSugerido.replace(extensao, '');
-                
-                // Abre a janela de pergunta pré-preenchida
                 let nomeEscolhido = prompt("Digite o nome para salvar o arquivo:", nomeSemExtensao);
                 
-                // Se o usuário clicar em "Cancelar" na janelinha ou deixar o texto vazio, aborta o salvamento
                 if (nomeEscolhido === null || nomeEscolhido.trim() === "") return;
                 
-                // Devolve a extensão ao final do nome que o usuário escolheu
                 let nomeFinal = nomeEscolhido.trim() + extensao;
 
                 const blob = new Blob(["\ufeff" + stringFinal], { type: `${mimeType};charset=utf-8;` });
@@ -2906,18 +3046,64 @@
             if (estadoCongelamento.ativo) atualizarEstilosCongelamento(); 
         }
     
-	    // --- NOVO: MOTOR DE BUSCA E SUBSTITUIÇÃO LOTE/INDIVIDUAL ---
+	    // --- NOVO: MOTOR DE BUSCA E SUBSTITUIÇÃO FLUTUANTE ---
+        const buscaModal = document.getElementById('buscaModal');
+        const buscaHeader = document.getElementById('buscaModalHeader');
+        let dragBusca = { ativo: false, offsetX: 0, offsetY: 0 };
+
+        // 1. Inicia o arrasto ao clicar no topo azul
+        buscaHeader.addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('close-x')) return; // Não faz nada se clicar no X
+            dragBusca.ativo = true;
+            const rect = buscaModal.getBoundingClientRect();
+            dragBusca.offsetX = e.clientX - rect.left;
+            dragBusca.offsetY = e.clientY - rect.top;
+            document.body.style.userSelect = 'none'; // Previne texto azul bugado
+        });
+
+        // 2. Move a janela com o mouse
+        document.addEventListener('mousemove', function(e) {
+            if (!dragBusca.ativo) return;
+            
+            let novoX = e.clientX - dragBusca.offsetX;
+            let novoY = e.clientY - dragBusca.offsetY;
+            
+            // BLINDAGEM: Não deixa a janela ser arrastada para fora do monitor
+            const limiteX = window.innerWidth - buscaModal.offsetWidth;
+            const limiteY = window.innerHeight - buscaModal.offsetHeight;
+            
+            novoX = Math.max(0, Math.min(novoX, limiteX));
+            novoY = Math.max(0, Math.min(novoY, limiteY));
+            
+            buscaModal.style.left = novoX + 'px';
+            buscaModal.style.top = novoY + 'px';
+        });
+
+        // 3. Solta a janela
+        document.addEventListener('mouseup', function() {
+            if (dragBusca.ativo) {
+                dragBusca.ativo = false;
+                document.body.style.userSelect = ''; 
+            }
+        });
+
         function abrirBuscaModal() {
             if (gradeBloqueada) return;
             sairModoEdicao();
-            document.getElementById('buscaModal').style.display = 'flex';
             
-            // Foca o cursor de texto na caixa "Localizar" automaticamente
+            // Só centraliza a janela se for a primeira vez abrindo
+            if (buscaModal.style.display === 'none') {
+                buscaModal.style.display = 'block';
+                buscaModal.style.top = '80px';
+                buscaModal.style.left = (window.innerWidth / 2 - 180) + 'px'; // Centro da tela
+            }
+            
+            // Foca o cursor na caixa "Localizar"
             setTimeout(() => document.getElementById('inputLocalizar').focus(), 50);
         }
 
         function fecharBuscaModal() {
-            document.getElementById('buscaModal').style.display = 'none';
+            buscaModal.style.display = 'none';
             if (celulaAtual) celulaAtual.focus();
         }
 
@@ -2967,7 +3153,8 @@
                 if (c >= totalColunas) { c = 0; r++; if (r >= totalLinhas) r = 0; }
             }
 
-            if (!achou) alert("Fim da busca. Termo não encontrado.");
+            // MUDANÇA: Texto muito mais preciso para a situação
+            if (!achou) alert("Fim da busca. Nenhuma outra ocorrência encontrada.");
         }
 
         function acaoSubstituirAtual() {
@@ -2987,9 +3174,14 @@
 
             // Verifica se a célula tem o alvo. Se sim, substitui. Depois pula para a próxima.
             if (regex.test(textoTd)) {
-                celulaAtual.innerText = textoTd.replace(regex, substituto);
+                let novoValor = textoTd.replace(regex, substituto);
+                celulaAtual.dataset.raw = novoValor; // BLINDAGEM DO ESTOQUE
+                celulaAtual.innerText = novoValor;
+                atualizarTodasAsFormulas(); // BLINDAGEM MATEMÁTICA
                 salvarEstado(); // Grava no histórico (Desfazer/Ctrl+Z)
-                acaoLocalizarProximo();
+                
+                // MUDANÇA AQUI: Aguarda 10 milissegundos para a tela "pintar" o dado novo antes de continuar a busca
+                setTimeout(() => acaoLocalizarProximo(), 10);
             } else {
                 acaoLocalizarProximo(); // Se não estava na célula certa, apenas procura a próxima
             }
@@ -3016,7 +3208,9 @@
                     let textoTd = td.innerText;
                     
                     if (regex.test(textoTd)) {
-                        td.innerText = textoTd.replace(regex, substituto);
+                        let novoValor = textoTd.replace(regex, substituto);
+                        td.dataset.raw = novoValor; // <--- BLINDAGEM DO ESTOQUE
+                        td.innerText = novoValor;
                         contagem++;
                     }
                 }
@@ -3098,15 +3292,21 @@
                     if (!td) continue;
                     
                     let raw = td.dataset.raw !== undefined ? td.dataset.raw : td.innerText;
+                    let strRaw = raw ? raw.toString() : ''; // Prevenção contra nulos
                     
-                    if (raw && raw.toString().startsWith('=')) {
-                        td.innerText = avaliarFormula(raw); // Mostra o cálculo na frente
-                        td.style.fontWeight = 'bold'; // <--- NOVO: Deixa o cálculo em negrito
-                    } else if (td.dataset.raw !== undefined) {
-                        td.innerText = td.dataset.raw; // Mostra o texto normal
-                        td.style.fontWeight = 'normal'; // <--- NOVO: Garante que texto comum não fique em negrito
-                    } else {
-                        td.style.fontWeight = 'normal'; // <--- NOVO: Limpa o formato de células vazias recém-criadas
+                    // Se começar com aspa simples ('), é um "escape" para forçar leitura como texto
+                    if (strRaw.startsWith("'")) {
+                        td.innerText = strRaw.substring(1); // Mostra na vitrine sem a aspa simples
+                        td.style.fontWeight = 'normal';
+                    } 
+                    // Senão, se for uma fórmula real que começa com "="
+                    else if (strRaw.startsWith('=')) {
+                        td.innerText = avaliarFormula(strRaw); 
+                        td.style.fontWeight = 'bold'; 
+                    } 
+                    else {
+                        td.innerText = strRaw; 
+                        td.style.fontWeight = 'normal'; 
                     }
                 }
             }
