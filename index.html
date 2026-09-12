@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="Fabiopsyduck">
+    <meta name="color-scheme" content="light only">
     <title>SimpleSheet</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -20,6 +21,8 @@
             height: 100vh;
             overflow: hidden;
             user-select: none;
+            color-scheme: light only; 
+            forced-color-adjust: none; 
         }
 
         .title-bar {
@@ -473,6 +476,15 @@
         table.export-modo-seguro td {
             position: static !important; /* Desliga todo o sticky para o html2canvas não bugar */
         }
+		
+		/* --- ADAPTAÇÕES PARA CELULAR (TOUCH) --- */
+        table {
+            -webkit-touch-callout: none; /* Bloqueia o menu nativo do iOS/Android ao segurar o dedo */
+        }
+        
+        .menu-item.has-submenu.toque-aberto > .submenu-flutuante {
+            display: block !important; /* Força o submenu a abrir no toque do dedo */
+        }
     </style>
 </head>
 <body>
@@ -750,7 +762,7 @@
         <div class="menu-separator"></div>
         <div class="menu-item" onmousedown="event.preventDefault()" onclick="copiarPosicoes()">📍 Copiar Coordenadas para Cálculo</div>
         
-        <div class="menu-item has-submenu">
+        <div class="menu-item has-submenu" onclick="toggleSubmenuMobile(event, this)">
             <span class="seta-esq">◄ </span>🧮 Transformar em Cálculo<span class="seta-dir"> ►</span>
             <div class="submenu-flutuante">
                 <!-- Opções Rápidas -->
@@ -762,7 +774,7 @@
                 <div class="menu-separator"></div>
                 
                 <!-- NOVO: Porcentagem com Submenu em cascata -->
-                <div class="menu-item has-submenu">
+                <div class="menu-item has-submenu" onclick="toggleSubmenuMobile(event, this)">
                     <span class="seta-esq">◄ </span>Porcentagem (%)<span class="seta-dir"> ►</span>
                     <div class="submenu-flutuante">
                         <div class="menu-item" onmousedown="event.preventDefault()" onclick="colarPorcentagem('EXTRAIR')">Extrair Valor (Parte do Todo)</div>
@@ -1893,6 +1905,121 @@
                 menu.classList.remove('menu-invertido-y');
             }
         }
+		
+		// --- NOVO: CONTROLE DE SUBMENUS PARA CELULAR ---
+        function toggleSubmenuMobile(e, menuPai) {
+            // Se for um PC com mouse, ignora e deixa o CSS :hover fazer o trabalho mágico
+            if (window.matchMedia("(pointer: fine)").matches) return; 
+            
+            // Impede que o toque feche o menu de contexto principal
+            e.stopPropagation(); 
+            
+            // Se tocou numa opção final (como "Somar"), deixa o comando rodar, não faz nada
+            if (!e.target.classList.contains('has-submenu') && e.target.tagName !== 'SPAN') return;
+
+            // Fecha outros submenus no mesmo nível para não poluir a tela
+            const irmaos = menuPai.parentElement.querySelectorAll('.has-submenu.toque-aberto');
+            irmaos.forEach(irmao => { if (irmao !== menuPai) irmao.classList.remove('toque-aberto'); });
+
+            // Abre ou fecha a gaveta tocada
+            menuPai.classList.toggle('toque-aberto');
+        }
+
+        // --- NOVO: MOTOR DE TOUCH APRIMORADO (SELEÇÃO, PINCEL E MENUS) ---
+        let timerToqueMenu;
+        let timerToqueArrasto;
+        let toqueX, toqueY;
+        let toqueModoArrasto = false; 
+
+        const tabelaGrid = document.getElementById('planilha');
+
+        tabelaGrid.addEventListener('touchstart', function(e) {
+            if (gradeBloqueada) return;
+            
+            const alvo = e.target;
+            if (alvo.tagName === 'TD' || alvo.tagName === 'TH') {
+                toqueX = e.touches[0].clientX;
+                toqueY = e.touches[0].clientY;
+                toqueModoArrasto = false;
+                
+                // Feedback Instantâneo: Já seleciona a célula ao encostar o dedo (se não for pincel)
+                if (alvo.tagName === 'TD' && !pincelAtivo) {
+                    sairModoEdicao();
+                    selecionarUmaCelula(alvo);
+                }
+
+                // 1. Cronômetro de Arrasto (Segurar 200ms para entrar no modo de Seleção/Pintura)
+                timerToqueArrasto = setTimeout(() => {
+                    toqueModoArrasto = true;
+                    if (navigator.vibrate) navigator.vibrate(20); // Micro-vibração de confirmação "grudou"
+                    
+                    if (pincelAtivo && alvo.tagName === 'TD') {
+                        isDraggingPincel = true;
+                        aplicarPintura(alvo, false);
+                    } else if (alvo.tagName === 'TD') {
+                        isDragging = true;
+                        let pos = getRowCol(alvo);
+                        dragStartRow = pos.r;
+                        dragStartCol = pos.c;
+                    }
+                }, 200);
+
+                // 2. Cronômetro de Menu de Contexto (Segurar 2500ms para abrir as opções)
+                timerToqueMenu = setTimeout(() => {
+                    if (isDragging || isDraggingPincel) return; // Cancela o menu se estiver arrastando
+                    const eventoSimulado = new MouseEvent('contextmenu', {
+                        bubbles: true, cancelable: true,
+                        clientX: toqueX, clientY: toqueY
+                    });
+                    alvo.dispatchEvent(eventoSimulado);
+                    if (navigator.vibrate) navigator.vibrate(50); // Vibração mais forte do menu
+                }, 2500); 
+            }
+        }, { passive: false });
+
+        tabelaGrid.addEventListener('touchmove', function(e) {
+            let atualX = e.touches[0].clientX;
+            let atualY = e.touches[0].clientY;
+
+            // Se o dedo moveu rápido DEMAIS (antes de 200ms), o usuário quer ROLAR a tela.
+            if (!toqueModoArrasto) {
+                if (Math.abs(atualX - toqueX) > 10 || Math.abs(atualY - toqueY) > 10) {
+                    clearTimeout(timerToqueArrasto);
+                    clearTimeout(timerToqueMenu);
+                }
+                return; // Permite o scroll nativo da página
+            }
+
+            // Se chegou aqui, segurou por 200ms. A partir de agora, é ARRASTO DE SELEÇÃO!
+            e.preventDefault(); // Bloqueia o scroll da tela do celular para focar na tabela
+            clearTimeout(timerToqueMenu); // Desiste de abrir o menu de contexto
+
+            // Pega o elemento exato que está embaixo do dedo escorregando
+            let elementoSobDedo = document.elementFromPoint(atualX, atualY);
+
+            if (elementoSobDedo && elementoSobDedo.tagName === 'TD') {
+                if (isDraggingPincel) {
+                    aplicarPintura(elementoSobDedo, false);
+                } else if (isDragging) {
+                    let pos = getRowCol(elementoSobDedo);
+                    selectRectangle(dragStartRow, dragStartCol, pos.r, pos.c, false);
+                    atualizarMirasVisuais(elementoSobDedo);
+                }
+            }
+        }, { passive: false });
+
+        tabelaGrid.addEventListener('touchend', function(e) {
+            clearTimeout(timerToqueArrasto);
+            clearTimeout(timerToqueMenu);
+            
+            if (isDragging) isDragging = false;
+            
+            if (isDraggingPincel) {
+                isDraggingPincel = false;
+                salvarEstado(); // Salva toda a pincelada como uma única ação
+            }
+            toqueModoArrasto = false;
+        });
 
         document.getElementById('planilha').addEventListener('contextmenu', function(e) {
             e.preventDefault();
